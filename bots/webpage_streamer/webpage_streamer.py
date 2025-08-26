@@ -17,6 +17,74 @@ import time
 import os
 
 import subprocess
+import asyncio
+import numpy as np
+
+from av.audio.frame import AudioFrame
+
+def audioframe_to_s16le_bytes(frame: AudioFrame, target_channels=2):
+    """
+    Convert aiortc AudioFrame to interleaved s16le bytes at 48k stereo.
+    """
+    # Ensure 48k
+    if frame.sample_rate != 48000:
+        # aiortc typically gives 48k; if not, let av resample:
+        frame.pts = None
+        frame.sample_rate = 48000
+
+    # Convert to s16
+    pcm = frame.to_ndarray(format="s16")  # shape: (channels, samples)
+    if pcm.ndim == 1:
+        pcm = np.expand_dims(pcm, axis=0)
+
+    # Upmix/downmix to target_channels
+    ch = pcm.shape[0]
+    if ch < target_channels:
+        pcm = np.vstack([pcm] + [pcm[0:1, :]] * (target_channels - ch))
+    elif ch > target_channels:
+        pcm = pcm[:target_channels, :]
+
+    # Interleave channels (C, N) -> (N, C) -> bytes
+    interleaved = pcm.T.astype(np.int16).tobytes()
+    return interleaved
+
+class AlsaLoopbackSink:
+    """
+    Writes 48k s16le stereo PCM to ALSA loopback using ffmpeg.
+    Target device: hw:Loopback,0,0 (provided by snd-aloop).
+    """
+    def __init__(self, device="hw:Loopback,0,0", sample_rate=48000, channels=2):
+        self.device = device
+        self.sample_rate = sample_rate
+        self.channels = channels
+        self._proc = None
+        self._stdin = None
+        self._task = None
+        self._stopped = asyncio.Event()
+
+    def start(self):
+        # Build ffmpeg proc: raw s16le → ALSA device
+        pass
+        
+
+    def write(self, pcm_bytes: bytes):
+        
+        # Calculate volume (RMS) of the PCM data
+        if len(pcm_bytes) > 0:
+            # Convert bytes back to int16 array for volume calculation
+            pcm_array = np.frombuffer(pcm_bytes, dtype=np.int16)
+            # Calculate RMS (Root Mean Square) for volume
+            rms = np.sqrt(np.mean(pcm_array.astype(np.float32) ** 2))
+            # Normalize to 0-100 scale (int16 max is 32767)
+            volume_percent = (rms / 32767.0) * 100
+            print(f"PCM volume: {volume_percent:.2f}% (RMS: {rms:.1f})")
+        else:
+            print("Empty PCM data")
+        
+        print(f"PCM bytes length: {len(pcm_bytes)}")
+
+    async def stop(self):
+        pass
 
 class WebpageStreamer(BotAdapter):
     def __init__(
@@ -26,7 +94,7 @@ class WebpageStreamer(BotAdapter):
     ):
         self.driver = None
         self.webpage_url = webpage_url
-        self.video_frame_size = (1580, 1024)
+        self.video_frame_size = (1280, 720)
         self.display_var_for_debug_recording = None
         self.display = None
 
@@ -35,7 +103,7 @@ class WebpageStreamer(BotAdapter):
         self.display_var_for_debug_recording = os.environ.get("DISPLAY")
         if os.environ.get("DISPLAY") is None:
             # Create virtual display only if no real display is available
-            self.display = Display(visible=0, size=(1930, 1090))
+            self.display = Display(visible=0, size=(1280, 720))
             self.display.start()
             self.display_var_for_debug_recording = self.display.new_display_var
 
@@ -46,7 +114,7 @@ class WebpageStreamer(BotAdapter):
         #options.add_argument("--use-fake-ui-for-media-stream")
         options.add_argument(f"--window-size={self.video_frame_size[0]},{self.video_frame_size[1]}")
         options.add_argument("--no-sandbox")
-        #options.add_argument("--start-fullscreen")
+        options.add_argument("--start-fullscreen")
         # options.add_argument('--headless=new')
         options.add_argument("--disable-gpu")
         #options.add_argument("--mute-audio")
@@ -79,7 +147,64 @@ from pathlib import Path
 
 from aiohttp import web
 from aiortc import RTCPeerConnection, RTCSessionDescription
-from aiortc.contrib.media import MediaPlayer
+from aiortc.contrib.media import MediaPlayer, MediaRelay
+
+PUMP_HTML = """<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Pumped Audio Player</title>
+  <style>body{font-family:system-ui;margin:2rem} audio{width:100%}</style>
+</head>
+<body>
+  <h1>Pumped Audio (listen-only)</h1>
+  <p>This page subscribes to the upstream audio captured by the other client.</p>
+  <button id="start">Start</button>
+  <audio id="a" autoplay controls></audio>
+
+<script>
+const startBtn = document.getElementById('start');
+const audioEl  = document.getElementById('a');
+
+startBtn.onclick = async () => {
+  startBtn.disabled = true;
+
+  const pc = new RTCPeerConnection();
+
+  // When server sends audio, play it.
+  const ms = new MediaStream();
+  pc.ontrack = (ev) => {
+    ms.addTrack(ev.track);
+    audioEl.srcObject = ms;
+    try { audioEl.play(); } catch(e) { console.error(e); }
+  };
+
+  // We only want to RECEIVE audio
+  pc.addTransceiver('audio', { direction: 'recvonly' });
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  const res = await fetch('/offer_pump_audio', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
+  });
+
+  if (!res.ok) {
+    const t = await res.text();
+    alert('No upstream audio yet (or error): ' + t);
+    startBtn.disabled = false;
+    return;
+  }
+
+  const answer = await res.json();
+  await pc.setRemoteDescription(answer);
+};
+</script>
+</body>
+</html>
+"""
 
 INDEX_HTML = """<!doctype html>
 <html>
@@ -101,20 +226,30 @@ const videoEl  = document.getElementById('v');
 startBtn.onclick = async () => {
   startBtn.disabled = true;
 
+  // 1) Ask for the user's microphone
+  const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  // 2) Create the RTCPeerConnection
   const pc = new RTCPeerConnection();
+
+  // 3) Receive the server's *video* (to preview) and optionally server audio
   const ms = new MediaStream();
   pc.ontrack = (ev) => {
-    ms.addTrack(ev.track);       // merge audio + video into one stream
+    ms.addTrack(ev.track);
     videoEl.srcObject = ms;
   };
 
-  // Offer to receive both
+  // We still want to receive the server's video
   pc.addTransceiver('video', { direction: 'recvonly' });
-  pc.addTransceiver('audio', { direction: 'recvonly' });
 
+  // ❗ Instead of recvonly audio, we now **send** our mic upstream:
+  for (const track of micStream.getAudioTracks()) {
+    pc.addTrack(track, micStream);
+  }
+
+  // Create/POST offer → set remote answer
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-
   const res = await fetch('/offer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -137,6 +272,49 @@ async def index(_req):
 
 pcs = set()
 
+# ADD THESE TWO LINES
+AUDIO_RELAY = MediaRelay()
+# will hold the *original* upstream AudioStreamTrack
+# from the first client that posts to /offer
+UPSTREAM_AUDIO_TRACK_KEY = "upstream_audio_track"
+
+async def pump_page(_req):
+    # GET /offer_pump_audio -> returns the listener page
+    return web.Response(text=PUMP_HTML, content_type="text/html")
+
+
+async def offer_pump_audio(req):
+    """
+    POST /offer_pump_audio
+    Return an SDP answer that *sends* the upstream audio (if present)
+    to this new peer connection (listen-only client).
+    """
+    params = await req.json()
+    offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
+
+    # Do we have an upstream audio yet?
+    upstream = req.app.get(UPSTREAM_AUDIO_TRACK_KEY)
+    if upstream is None:
+        return web.Response(status=409, text="No upstream audio has been published yet.")
+
+    pc = RTCPeerConnection()
+    pcs.add(pc)
+
+    # Re-broadcast using the relay so multiple listeners are OK
+    rebroadcast_track = AUDIO_RELAY.subscribe(upstream)
+    pc.addTrack(rebroadcast_track)
+
+    @pc.on("connectionstatechange")
+    async def _on_state():
+        if pc.connectionState in ("failed", "closed", "disconnected"):
+            await pc.close()
+            pcs.discard(pc)
+
+    await pc.setRemoteDescription(offer)
+    answer = await pc.createAnswer()
+    await pc.setLocalDescription(answer)
+    return web.json_response({"sdp": pc.localDescription.sdp, "type": pc.localDescription.type})
+
 async def offer(req):
     params = await req.json()
     offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
@@ -144,20 +322,34 @@ async def offer(req):
     pc = RTCPeerConnection()
     pcs.add(pc)
 
-    # Attach webcam + mic (MediaPlayer uses FFmpeg devices under the hood)
+    # --- server-to-client (unchanged): send your local video/audio if desired ---
     v_player = req.app["video_player"]
     a_player = req.app["audio_player"]
 
     if v_player and v_player.video:
         pc.addTrack(v_player.video)
+    # You can still send server audio if you want the page to hear server audio too:
     if a_player and a_player.audio:
         pc.addTrack(a_player.audio)
+
+    # --- NEW: receive client's mic and feed to ALSA loopback ---
+    #loopback_sink = AlsaLoopbackSink(device="hw:Loopback,0,0", sample_rate=48000, channels=2)
+    #loopback_sink.start()
+
+    @pc.on("track")
+    def on_track(track):
+        if track.kind == "audio":
+            # store the ORIGINAL upstream track for rebroadcast
+            req.app[UPSTREAM_AUDIO_TRACK_KEY] = track
+            logger.info("Upstream audio track set for rebroadcast.")
 
     @pc.on("connectionstatechange")
     async def _on_state():
         if pc.connectionState in ("failed", "closed", "disconnected"):
             await pc.close()
             pcs.discard(pc)
+            pass
+            #await loopback_sink.stop()
 
     await pc.setRemoteDescription(offer)
     answer = await pc.createAnswer()
@@ -191,6 +383,11 @@ def load_webapp(display_var_for_debug_recording):
     app = web.Application()
     app.router.add_get("/", index)
     app.router.add_post("/offer", offer)
+
+
+    app.router.add_get("/offer_pump_audio", pump_page)   # serves the HTML player
+    app.router.add_post("/offer_pump_audio", offer_pump_audio)  # SDP exchange
+
     app["video_player"] = video_player
     app["audio_player"] = audio_player
 
