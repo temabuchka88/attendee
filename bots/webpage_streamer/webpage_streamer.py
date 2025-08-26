@@ -132,6 +132,16 @@ class WebpageStreamer(BotAdapter):
         self.driver = webdriver.Chrome(options=options)
         logger.info(f"web driver server initialized at port {self.driver.service.port}")
 
+        with open("bots/webpage_streamer/webpage_streamer_payload.js", "r") as file:
+            payload_code = file.read()
+
+        combined_code = f"""
+            {payload_code}
+        """
+
+        # Add the combined script to execute on new document
+        self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": combined_code})
+
         # navigate to the webpage
         self.driver.get(self.webpage_url)
 
@@ -185,7 +195,7 @@ startBtn.onclick = async () => {
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
 
-  const res = await fetch('/offer_pump_audio', {
+  const res = await fetch('http://localhost:8000/offer_pump_audio', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
@@ -381,12 +391,39 @@ def load_webapp(display_var_for_debug_recording):
     audio_player = MediaPlayer(audio_device, format=audio_format)
 
     app = web.Application()
+    # Add CORS handling for preflight requests
+    async def handle_cors_preflight(request):
+        """Handle CORS preflight requests"""
+        return web.Response(
+            headers={
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Max-Age': '86400',
+            }
+        )
+
+    # Add CORS headers to all responses
+    @web.middleware
+    async def add_cors_headers(request, handler):
+        """Add CORS headers to all responses"""
+        response = await handler(request)
+        response.headers.update({
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        })
+        return response
+
+    app.middlewares.append(add_cors_headers)
+    
     app.router.add_get("/", index)
     app.router.add_post("/offer", offer)
-
+    app.router.add_options("/offer", handle_cors_preflight)
 
     app.router.add_get("/offer_pump_audio", pump_page)   # serves the HTML player
     app.router.add_post("/offer_pump_audio", offer_pump_audio)  # SDP exchange
+    app.router.add_options("/offer_pump_audio", handle_cors_preflight)
 
     app["video_player"] = video_player
     app["audio_player"] = audio_player
