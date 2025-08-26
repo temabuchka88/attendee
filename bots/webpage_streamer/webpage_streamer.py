@@ -172,7 +172,7 @@ def load_webapp(display_var_for_debug_recording):
     video_format = "x11grab"
 
     audio_device = "default"
-    audio_format = "pulse"
+    audio_format = "alsa"
 
     port = 8000
 
@@ -186,7 +186,7 @@ def load_webapp(display_var_for_debug_recording):
     video_player = MediaPlayer(video_device, format=video_format, options=v_opts)
 
     # Audio player: let aiortc/ffmpeg handle resampling to 48k
-    audio_player = MediaPlayer("ziggy.mp4")
+    audio_player = MediaPlayer(audio_device, format=audio_format)
 
     app = web.Application()
     app.router.add_get("/", index)
