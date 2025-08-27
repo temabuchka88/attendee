@@ -2639,6 +2639,14 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
     });
     const answer = await res.json();
     await pc.setRemoteDescription(answer);
+
+
+
+    await window.httpProxy.fetch('http://attendee-webpage-streamer-local:8000/start_streaming', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+      });
+
     }
     catch (e) {
         ws.sendJson({

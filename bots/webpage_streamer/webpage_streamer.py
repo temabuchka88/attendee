@@ -86,6 +86,9 @@ class AlsaLoopbackSink:
     async def stop(self):
         pass
 
+global_driver = None
+global_driver_url = None
+
 class WebpageStreamer(BotAdapter):
     def __init__(
         self,
@@ -93,12 +96,14 @@ class WebpageStreamer(BotAdapter):
         webpage_url,
     ):
         self.driver = None
-        self.webpage_url = webpage_url
+        self.webpage_url = "https://bouncing-ball-test.attendee-website-2.pages.dev/"
         self.video_frame_size = (1280, 720)
         self.display_var_for_debug_recording = None
         self.display = None
 
     def init_driver(self):
+        global global_driver
+        global global_driver_url
 
         self.display_var_for_debug_recording = os.environ.get("DISPLAY")
         if os.environ.get("DISPLAY") is None:
@@ -141,12 +146,8 @@ class WebpageStreamer(BotAdapter):
 
         # Add the combined script to execute on new document
         self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": combined_code})
-
-        # navigate to the webpage
-        self.driver.get(self.webpage_url)
-
-        # wait for the page to load
-        self.driver.implicitly_wait(600)
+        global_driver = self.driver
+        global_driver_url = self.webpage_url
 
         load_webapp(self.display_var_for_debug_recording)
 
@@ -366,6 +367,13 @@ async def offer(req):
     await pc.setLocalDescription(answer)
     return web.json_response({"sdp": pc.localDescription.sdp, "type": pc.localDescription.type})
 
+async def start_streaming(req):
+    #params = await req.json()
+    #webpage_url = params["webpage_url"]
+    print(f"Starting streaming to {global_driver_url}")
+    global_driver.get(global_driver_url)
+    return web.json_response({"status": "success"})
+
 def load_webapp(display_var_for_debug_recording):
 
     video_size = "1280x720"
@@ -417,6 +425,7 @@ def load_webapp(display_var_for_debug_recording):
 
     app.middlewares.append(add_cors_headers)
     
+    app.router.add_post("/start_streaming", start_streaming)
     app.router.add_get("/", index)
     app.router.add_post("/offer", offer)
     app.router.add_options("/offer", handle_cors_preflight)
