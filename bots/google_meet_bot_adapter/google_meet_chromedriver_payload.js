@@ -271,7 +271,7 @@ class StyleManager {
         }, 5000);
 
 
-        window.startStreamingFromWebpage();
+        window.startStreamingFromWebpage(destination.stream);
     }
     
     async processMixedAudioTrack() {
@@ -2594,8 +2594,9 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
       });
   };
 
-  async function startStreamingFromWebpage() { 
-    
+  async function startStreamingFromWebpage(pureAudioStream) { 
+    try
+    {
     // 2) Create the RTCPeerConnection
     const pc = new RTCPeerConnection();
   
@@ -2611,7 +2612,11 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
   
     // We still want to receive the server's video
     pc.addTransceiver('video', { direction: 'recvonly' });
-    pc.addTransceiver('audio', { direction: 'recvonly' });
+
+    // ❗ Instead of recvonly audio, we now **send** our mic upstream:
+    for (const track of pureAudioStream.getAudioTracks()) {
+        pc.addTrack(track, pureAudioStream);
+    }
   
     // Create/POST offer → set remote answer
     const offer = await pc.createOffer();
@@ -2634,6 +2639,13 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
     });
     const answer = await res.json();
     await pc.setRemoteDescription(answer);
+    }
+    catch (e) {
+        ws.sendJson({
+            type: "start_streaming_from_webpage_error",
+            error: e.message
+        });
+    }
   };
 
 window.startStreamingFromWebpage = startStreamingFromWebpage;

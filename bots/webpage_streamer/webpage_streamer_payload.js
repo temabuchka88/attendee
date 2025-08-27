@@ -376,4 +376,4 @@ async function startReceivingPumpAudio() {
 
 setTimeout(() => {
     startReceivingPumpAudio();
-}, 10000);
+}, 30000);
