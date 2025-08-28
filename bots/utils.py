@@ -423,6 +423,45 @@ def domain_and_subdomain_from_url(url):
     return extract_from_url.subdomain + "." + extract_from_url.registered_domain
 
 
+def is_suspicious_meeting_id(meeting_id: str) -> bool:
+    if len(meeting_id) < 20:
+        return True
+
+    if len(set(meeting_id)) == 1:
+        return True
+
+
+    for i in range(1, len(meeting_id) // 2 + 1):
+        substring = meeting_id[:i]
+        if substring * (len(meeting_id) // i) == meeting_id:
+            return True
+
+    if len(set(meeting_id)) < 4:
+        return True
+
+    return False
+
+
+def is_valid_teams_url(url: str) -> bool:
+
+    if not url:
+        return False
+
+    pattern = re.compile(
+        r"^https://teams\.(microsoft|live)\.com/l/meetup-join/"
+        r"19%3ameeting_([a-zA-Z0-9]{20,})@thread\.v2/0(\?.*)?$"
+    )
+    
+    match = pattern.match(url)
+    if not match:
+        return False
+
+    meeting_id = match.group(2)
+    if is_suspicious_meeting_id(meeting_id.lower()):
+        return False
+
+    return True
+
 def meeting_type_from_url(url):
     if not url:
         return None
@@ -434,10 +473,12 @@ def meeting_type_from_url(url):
         return MeetingTypes.ZOOM
     elif domain_and_subdomain == "meet.google.com":
         return MeetingTypes.GOOGLE_MEET
-    elif domain_and_subdomain == "teams.microsoft.com" or domain_and_subdomain == "teams.live.com":
-        return MeetingTypes.TEAMS
+    elif domain_and_subdomain and domain_and_subdomain.lower() in ("teams.microsoft.com", "teams.live.com"):
+        if is_valid_teams_url(url):
+            return MeetingTypes.TEAMS
     else:
         return None
+
 
 
 def transcription_provider_from_bot_creation_data(data):
