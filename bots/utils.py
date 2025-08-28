@@ -1,5 +1,5 @@
 import io
-
+import re
 import cv2
 import numpy as np
 from pydub import AudioSegment
@@ -443,24 +443,29 @@ def is_suspicious_meeting_id(meeting_id: str) -> bool:
 
 
 def is_valid_teams_url(url: str) -> bool:
-
     if not url:
         return False
 
-    pattern = re.compile(
+    meetup_pattern = re.compile(
         r"^https://teams\.(microsoft|live)\.com/l/meetup-join/"
         r"19%3ameeting_([a-zA-Z0-9]{20,})@thread\.v2/0(\?.*)?$"
     )
-    
-    match = pattern.match(url)
-    if not match:
-        return False
 
-    meeting_id = match.group(2)
-    if is_suspicious_meeting_id(meeting_id.lower()):
-        return False
+    simple_meet_pattern = re.compile(
+        r"^https://teams\.live\.com/meet/\d+(\?.*)?$"
+    )
 
-    return True
+    meetup_match = meetup_pattern.match(url)
+    if meetup_match:
+        meeting_id = meetup_match.group(2)
+        if is_suspicious_meeting_id(meeting_id.lower()):
+            return False
+        return True
+
+    if simple_meet_pattern.match(url):
+        return True
+
+    return False
 
 def meeting_type_from_url(url):
     if not url:
