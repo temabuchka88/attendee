@@ -128,6 +128,9 @@ class StyleManager {
         this.silenceCheckInterval = null;
         this.memoryUsageCheckInterval = null;
         this.neededInteractionsInterval = null;
+
+        // Stream used which combines the audio tracks from the meeting. Does NOT include the bot's audio
+        this.meetingAudioStream = null;
     }
 
     addAudioTrack(audioTrack) {
@@ -270,8 +273,11 @@ class StyleManager {
             this.checkNeededInteractions();
         }, 5000);
 
+        this.meetingAudioStream = destination.stream;
+    }
 
-        window.startStreamingFromWebpage(destination.stream);
+    getMeetingAudioStream() {
+        return this.meetingAudioStream;
     }
     
     async processMixedAudioTrack() {
@@ -2187,7 +2193,8 @@ class BotOutputManager {
         this.botOutputAudioTrack = null;
 
         // For outputting a stream
-        this.specialStream = null;
+        this.botOutputMediaStream = null;
+        this.botOutputPeerConnection = null;
     }
 
     connectVideoSourceToAudioContext() {
@@ -2197,11 +2204,11 @@ class BotOutputManager {
         }
     }
 
-    playSpecialStream(stream) {
-        if (this.specialStream) {
-            this.specialStream.disconnect();
+    playMediaStream(stream) {
+        if (this.botOutputMediaStream) {
+            this.botOutputMediaStream.disconnect();
         }
-        this.specialStream = stream;
+        this.botOutputMediaStream = stream;
         
         turnOffMicAndCamera();
 
@@ -2531,6 +2538,45 @@ class BotOutputManager {
         const timeUntilNextProcess = (this.nextPlayTime - currentTime) * 1000 * 0.8;
         setTimeout(() => this.processAudioQueue(), Math.max(0, timeUntilNextProcess));
     }
+
+    async getBotOutputPeerConnectionOffer() {
+        try
+        {
+            // 2) Create the RTCPeerConnection
+            this.botOutputPeerConnection = new RTCPeerConnection();
+        
+            // 3) Receive the server's *video* and *audio*
+            const ms = new MediaStream();
+            this.botOutputPeerConnection.ontrack = (ev) => {
+                ms.addTrack(ev.track);
+                // If we've received both video and audio, play the stream
+                if (ms.getVideoTracks().length > 0 && ms.getAudioTracks().length > 0) {
+                    botOutputManager.playMediaStream(ms);
+                }
+            };
+        
+            // We still want to receive the server's video
+            this.botOutputPeerConnection.addTransceiver('video', { direction: 'recvonly' });
+        
+            // ❗ Instead of recvonly audio, we now **send** our mic upstream:
+            const meetingAudioStream = window.styleManager.getMeetingAudioStream();
+            for (const track of meetingAudioStream.getAudioTracks()) {
+                this.botOutputPeerConnection.addTrack(track, meetingAudioStream);
+            }
+        
+            // Create/POST offer → set remote answer
+            const offer = await this.botOutputPeerConnection.createOffer();
+            await this.botOutputPeerConnection.setLocalDescription(offer);
+            return { sdp: this.botOutputPeerConnection.localDescription.sdp, type: this.botOutputPeerConnection.localDescription.type };
+        }
+        catch (e) {
+            return { error: e.message };
+        }
+    }
+
+    async startBotOutputPeerConnection(offerResponse) {
+        await this.botOutputPeerConnection.setRemoteDescription(offerResponse);
+    }
 }
 
 const botOutputManager = new BotOutputManager();
@@ -2558,9 +2604,9 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
                 newStream.addTrack(botOutputManager.botOutputCanvasElementCaptureStream.getVideoTracks()[0]);
             }
          }
-         if (constraints.video && botOutputManager.specialStream) {
-            console.log("Adding special stream", botOutputManager.specialStream.getVideoTracks()[0]);
-            newStream.addTrack(botOutputManager.specialStream.getVideoTracks()[0]);
+         if (constraints.video && botOutputManager.botOutputMediaStream) {
+            console.log("Adding special stream", botOutputManager.botOutputMediaStream.getVideoTracks()[0]);
+            newStream.addTrack(botOutputManager.botOutputMediaStream.getVideoTracks()[0]);
         }
 
         // Audio sending not supported yet
@@ -2576,12 +2622,12 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
             botOutputManager.connectVideoSourceToAudioContext();
         }
 
-        if (botOutputManager.specialStream) {
+        if (botOutputManager.botOutputMediaStream) {
             // connect the special stream to the audio context
-            if (botOutputManager.specialStream.getAudioTracks().length > 0) {
+            if (botOutputManager.botOutputMediaStream.getAudioTracks().length > 0) {
                 botOutputManager.initializeBotOutputAudioTrack();
-                const specialStreamSource = botOutputManager.audioContextForBotOutput.createMediaStreamSource(botOutputManager.specialStream);
-                specialStreamSource.connect(botOutputManager.gainNode);
+                const botOutputMediaStreamSource = botOutputManager.audioContextForBotOutput.createMediaStreamSource(botOutputManager.botOutputMediaStream);
+                botOutputMediaStreamSource.connect(botOutputManager.gainNode);
                 console.log("Connected special stream audio track to audio context");
             }
         }
@@ -2593,7 +2639,7 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
         throw err;
       });
   };
-
+/*
   async function startStreamingFromWebpage(pureAudioStream) { 
     try
     {
@@ -2606,7 +2652,7 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
       ms.addTrack(ev.track);
       // If we've received both video and audio, play the stream
       if (ms.getVideoTracks().length > 0 && ms.getAudioTracks().length > 0) {
-        botOutputManager.playSpecialStream(ms);
+        botOutputManager.playMediaStream(ms);
       }
     };
   
@@ -2645,7 +2691,7 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
     await window.httpProxy.fetch('http://attendee-webpage-streamer-local:8000/start_streaming', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ url: "" })
+        body: JSON.stringify({ url: "https://bouncing-ball-test.attendee-website-2.pages.dev/vapi_example?key=f96e993b-5551-4422-8780-2c56ebcdfd6d&assistant=31ecce40-544c-4e40-93f5-b364dac3cc4a" })
       });
 
     }
@@ -2657,4 +2703,4 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
     }
   };
 
-window.startStreamingFromWebpage = startStreamingFromWebpage;
+window.startStreamingFromWebpage = startStreamingFromWebpage;*/

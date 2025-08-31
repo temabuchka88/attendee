@@ -45,6 +45,7 @@ class WebBotAdapter(BotAdapter):
         start_recording_screen_callback,
         stop_recording_screen_callback,
         video_frame_size: tuple[int, int],
+        voice_agent_url: str,
     ):
         self.display_name = display_name
         self.send_message_callback = send_message_callback
@@ -97,6 +98,8 @@ class WebBotAdapter(BotAdapter):
         self.ready_to_send_chat_messages = False
 
         self.recording_paused = False
+
+        self.voice_agent_url = voice_agent_url
 
     def pause_recording(self):
         self.recording_paused = True
@@ -662,6 +665,8 @@ class WebBotAdapter(BotAdapter):
 
         self.media_sending_enable_timestamp_ms = time.time() * 1000
 
+        self.start_streaming_from_webpage()
+
     def leave(self):
         if self.left_meeting:
             return
@@ -760,6 +765,21 @@ class WebBotAdapter(BotAdapter):
                 logger.info(f"Auto-leaving meeting because bot has been running for more than {self.automatic_leave_configuration.max_uptime_seconds} seconds")
                 self.send_message_callback({"message": self.Messages.ADAPTER_REQUESTED_BOT_LEAVE_MEETING, "leave_reason": BotAdapter.LEAVE_REASON.AUTO_LEAVE_MAX_UPTIME})
                 return
+
+    def start_streaming_from_webpage(self):
+        if not self.voice_agent_url:
+            return
+
+        logger.info(f"Start streaming from webpage: {self.voice_agent_url}")
+        peerConnectionOffer = self.driver.execute_script("return window.botOutputManager.getBotOutputPeerConnectionOffer();")
+        logger.info(f"Peer connection offer: {peerConnectionOffer}")
+
+        offer_response = requests.post("http://attendee-webpage-streamer-local:8000/offer", json={"sdp": peerConnectionOffer["sdp"], "type": peerConnectionOffer["type"]})
+        logger.info(f"Offer response: {offer_response.json()}")
+        self.driver.execute_script(f"window.botOutputManager.startBotOutputPeerConnection({json.dumps(offer_response.json())});")
+
+        start_streaming_response = requests.post("http://attendee-webpage-streamer-local:8000/start_streaming", json={"url": self.voice_agent_url})
+        logger.info(f"Start streaming response: {start_streaming_response}")
 
     def ready_to_show_bot_image(self):
         self.send_message_callback({"message": self.Messages.READY_TO_SHOW_BOT_IMAGE})
