@@ -117,20 +117,20 @@ class BotPodCreator:
                         "ephemeral-storage": os.getenv("WEBPAGE_STREAMING_EPHEMERAL_STORAGE_LIMIT", "0.5Gi")
                     }
                 ),
-                env_from=[
-                    # environment variables for the webpage streamer
-                    client.V1EnvFromSource(
-                        config_map_ref=client.V1ConfigMapEnvSource(
-                            name="env"
-                        )
-                    ),
-                    client.V1EnvFromSource(
-                        secret_ref=client.V1SecretEnvSource(
-                            name="app-secrets"
-                        )
+                env=[
+                    client.V1EnvVar(
+                        name="DJANGO_SETTINGS_MODULE",
+                        value=os.getenv("DJANGO_SETTINGS_MODULE")
                     )
-                ],
-                env=[]
+                ] if os.getenv("DJANGO_SETTINGS_MODULE") else [],
+                security_context=client.V1SecurityContext(
+                    run_as_non_root=True,
+                    run_as_user=65532,  # nobody
+                    read_only_root_filesystem=True,
+                    allow_privilege_escalation=False,
+                    capabilities=client.V1Capabilities(drop=["ALL"]),
+                    seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
+                ),
             )
 
         containers = [bot_container] if not add_webpage_streamer else [bot_container, webpage_streamer_container]

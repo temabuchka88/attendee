@@ -298,7 +298,7 @@ class WebpageStreamer(BotAdapter):
         async def shutdown(req):
             """Shutdown endpoint to gracefully shutdown the process."""
             logger.info("Shutting down process")
-            #await self.shutdown_process()
+            await self.shutdown_process()
             return web.json_response({"status": "success"})
 
         video_size = f"{self.video_frame_size[0]}x{self.video_frame_size[1]}"
@@ -364,7 +364,7 @@ class WebpageStreamer(BotAdapter):
         app.middlewares.append(add_cors_headers)
 
         app.router.add_post("/start_streaming", start_streaming)
-        
+
         app.router.add_post("/keepalive", keepalive)
         app.router.add_options("/keepalive", handle_cors_preflight)
 
@@ -376,7 +376,6 @@ class WebpageStreamer(BotAdapter):
 
         app.router.add_post("/offer_meeting_audio", offer_meeting_audio)  # SDP exchange
         app.router.add_options("/offer_meeting_audio", handle_cors_preflight)
-
 
         app["video_player"] = video_player
         app["audio_player"] = audio_player
