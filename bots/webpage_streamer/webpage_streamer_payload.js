@@ -153,7 +153,7 @@
   });
 
   // ---------- Your WebRTC fetcher: pipe remote audio into the virtual mic ----------
-  async function startReceivingPumpAudio() {
+  async function startReceivingMeetingAudio() {
     const pc = new RTCPeerConnection();
 
     // Collect remote audio
@@ -171,7 +171,7 @@
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    const res = await fetch("http://localhost:8000/offer_pump_audio", {
+    const res = await fetch("http://localhost:8000/offer_meeting_audio", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
@@ -188,5 +188,5 @@
   }
 
   // Kick it off (adjust timing as you like)
-  setTimeout(() => { startReceivingPumpAudio(); }, 1000);
+  setTimeout(() => { startReceivingMeetingAudio(); }, 1000);
 })();

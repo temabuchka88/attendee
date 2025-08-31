@@ -150,9 +150,9 @@ class WebpageStreamer(BotAdapter):
         # from the first client that posts to /offer
         UPSTREAM_AUDIO_TRACK_KEY = "upstream_audio_track"
 
-        async def offer_pump_audio(req):
+        async def offer_meeting_audio(req):
             """
-            POST /offer_pump_audio
+            POST /offer_meeting_audio
             Return an SDP answer that *sends* the upstream audio (if present)
             to this new peer connection (listen-only client).
             """
@@ -316,8 +316,8 @@ class WebpageStreamer(BotAdapter):
         app.router.add_post("/offer", offer)
         app.router.add_options("/offer", handle_cors_preflight)
 
-        app.router.add_post("/offer_pump_audio", offer_pump_audio)  # SDP exchange
-        app.router.add_options("/offer_pump_audio", handle_cors_preflight)
+        app.router.add_post("/offer_meeting_audio", offer_meeting_audio)  # SDP exchange
+        app.router.add_options("/offer_meeting_audio", handle_cors_preflight)
 
         app["video_player"] = video_player
         app["audio_player"] = audio_player

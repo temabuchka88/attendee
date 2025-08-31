@@ -723,6 +723,13 @@ class WebBotAdapter(BotAdapter):
                 self.send_message_callback({"message": self.Messages.ADAPTER_REQUESTED_BOT_LEAVE_MEETING, "leave_reason": BotAdapter.LEAVE_REASON.AUTO_LEAVE_MAX_UPTIME})
                 return
 
+    def streaming_service_hostname(self):
+        # If we're running in k8s, the streaming service will run in another container on the same pod, so we can use localhost
+        if os.getenv("LAUNCH_BOT_METHOD") == "kubernetes":
+            return "localhost"
+        # Otherwise the streaming service will be running in a separate docker compose service, so we address it using the service name
+        return "attendee-webpage-streamer-local"
+
     def start_streaming_from_webpage(self):
         if not self.voice_agent_url:
             return
@@ -734,11 +741,11 @@ class WebBotAdapter(BotAdapter):
             logger.error(f"Error getting peer connection offer: {peerConnectionOffer.get('error')}, returning")
             return
 
-        offer_response = requests.post("http://attendee-webpage-streamer-local:8000/offer", json={"sdp": peerConnectionOffer["sdp"], "type": peerConnectionOffer["type"]})
+        offer_response = requests.post(f"http://{self.streaming_service_hostname()}:8000/offer", json={"sdp": peerConnectionOffer["sdp"], "type": peerConnectionOffer["type"]})
         logger.info(f"Offer response: {offer_response.json()}")
         self.driver.execute_script(f"window.botOutputManager.startBotOutputPeerConnection({json.dumps(offer_response.json())});")
 
-        start_streaming_response = requests.post("http://attendee-webpage-streamer-local:8000/start_streaming", json={"url": self.voice_agent_url})
+        start_streaming_response = requests.post(f"http://{self.streaming_service_hostname()}:8000/start_streaming", json={"url": self.voice_agent_url})
         logger.info(f"Start streaming response: {start_streaming_response}")
 
     def ready_to_show_bot_image(self):
