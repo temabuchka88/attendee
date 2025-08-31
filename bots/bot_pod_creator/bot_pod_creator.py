@@ -33,6 +33,7 @@ class BotPodCreator:
         bot_id: int,
         bot_name: Optional[str] = None,
         bot_cpu_request: Optional[int] = None,
+        add_webpage_streamer: Optional[bool] = False,
     ) -> Dict:
         """
         Create a bot pod with configuration from environment.
@@ -66,16 +67,7 @@ class BotPodCreator:
             annotations["karpenter.sh/do-not-disrupt"] = "true"
             annotations["karpenter.sh/do-not-evict"] = "true"
 
-        pod = client.V1Pod(
-            metadata=client.V1ObjectMeta(
-                name=bot_name,
-                namespace=self.namespace,
-                labels=labels,
-                annotations=annotations
-            ),
-            spec=client.V1PodSpec(
-                containers=[
-                    client.V1Container(
+        bot_container = client.V1Container(
                         name="bot-proc",
                         image=self.image,
                         image_pull_policy="Always",
@@ -106,7 +98,51 @@ class BotPodCreator:
                         ],
                         env=[]
                     )
+
+        webpage_streamer_container = client.V1Container(
+                name="webpage-streamer",
+                image=self.image,
+                image_pull_policy="Always",
+                command=webpage_command,
+                resources=client.V1ResourceRequirements(
+                    requests={
+                        "cpu": os.getenv("WEBPAGE_STREAMING_CPU_REQUEST", "1"),
+                        "memory": os.getenv("WEBPAGE_STREAMING_MEMORY_REQUEST", "4Gi"),
+                        "ephemeral-storage": os.getenv("WEBPAGE_STREAMING_EPHEMERAL_STORAGE_REQUEST", "5Gi")
+                    },
+                    limits={
+                        "memory": os.getenv("WEBPAGE_STREAMING_MEMORY_LIMIT", "4Gi"),
+                        "ephemeral-storage": os.getenv("WEBPAGE_STREAMING_EPHEMERAL_STORAGE_LIMIT", "5Gi")
+                    }
+                ),
+                env_from=[
+                    # environment variables for the webpage streamer
+                    client.V1EnvFromSource(
+                        config_map_ref=client.V1ConfigMapEnvSource(
+                            name="env"
+                        )
+                    ),
+                    client.V1EnvFromSource(
+                        secret_ref=client.V1SecretEnvSource(
+                            name="app-secrets"
+                        )
+                    )
                 ],
+                env=[]
+            )
+
+        containers = [bot_container] if not add_webpage_streamer else [bot_container, webpage_streamer_container]
+            
+
+        pod = client.V1Pod(
+            metadata=client.V1ObjectMeta(
+                name=bot_name,
+                namespace=self.namespace,
+                labels=labels,
+                annotations=annotations
+            ),
+            spec=client.V1PodSpec(
+                containers=containers,
                 restart_policy="Never",
                 image_pull_secrets=[
                     client.V1LocalObjectReference(

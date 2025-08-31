@@ -517,6 +517,9 @@ class Bot(models.Model):
     def voice_agent_url(self):
         return self.settings.get("voice_agent_settings", {}).get("url", None)
 
+    def should_launch_webpage_streamer(self):
+        return bool(self.voice_agent_url())
+
     def zoom_tokens_callback_url(self):
         callback_settings = self.settings.get("callback_settings", {})
         if callback_settings is None:
