@@ -103,7 +103,7 @@ class BotPodCreator:
                 name="webpage-streamer",
                 image=self.image,
                 image_pull_policy="Always",
-                command=webpage_command,
+                command=["/bin/bash", "-c", f"/opt/bin/entrypoint.sh && python manage.py stream_webpage"],
                 resources=client.V1ResourceRequirements(
                     requests={
                         "cpu": os.getenv("WEBPAGE_STREAMING_CPU_REQUEST", "1"),
