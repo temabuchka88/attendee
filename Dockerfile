@@ -93,27 +93,21 @@ WORKDIR /opt
 
 FROM deps AS build
 
-# Create a non-root user that will own & run the app and PulseAudio
-# Use uid 1000 so host bind-mounts usually line up.
+# Create non-root user once
 RUN useradd -m -u 1000 -s /bin/bash app
 
-# Workdir & code
+# Workdir owned by app in one shot during copy
 ENV project=attendee
 ENV cwd=/$project
 WORKDIR $cwd
-COPY . .
 
-# Entrypoint script
-COPY entrypoint.sh /opt/bin/entrypoint.sh
-RUN chmod +x /opt/bin/entrypoint.sh \
-    && chown -R app:app /opt /$project
+# Copy only what you need; set ownership/perm at copy time
+COPY --chown=app:app --chmod=0755 entrypoint.sh /opt/bin/entrypoint.sh
+COPY --chown=app:app . .   # no need for a later chown -R
 
-# Switch to the non-root user (critical for per-user PulseAudio)
+# Switch to non-root AFTER copies to avoid permission flakiness
 USER app
 
-# Use tini for proper signal handling; entrypoint starts PulseAudio and then execs CMD.
-ENTRYPOINT ["/tini", "--", "/opt/bin/entrypoint.sh"]
-
-# Your app command here (example). Keep or replace with your actual start.
-# If you prefer an interactive shell by default, you can use ["bash"].
-#CMD ["bash"]
+# Use tini + entrypoint; CMD can be overridden by compose
+ENTRYPOINT ["/tini","--","/opt/bin/entrypoint.sh"]
+CMD ["bash"]
