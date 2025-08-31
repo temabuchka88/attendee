@@ -429,13 +429,11 @@ def is_valid_teams_url(url: str) -> bool:
     if not url:
         return False
 
-    # Meetup-join links
     meetup_pattern = re.compile(
         r"^https://teams\.(microsoft|live)\.com/l/meetup-join/"
         r"19%3ameeting_([a-zA-Z0-9]{20,})@thread\.v2/0(\?.*)?$"
     )
 
-    # Simple /meet links
     simple_meet_pattern = re.compile(
         r"^https://teams\.live\.com/meet/(\d+)(\?.*)?$"
     )
@@ -451,17 +449,6 @@ def is_valid_teams_url(url: str) -> bool:
         meeting_id = simple_match.group(1)
 
     if not meeting_id:
-        return False
-
-    if len(set(meeting_id.lower())) == 1:
-        return False
-
-    for i in range(1, len(meeting_id) // 2 + 1):
-        substring = meeting_id[:i]
-        if substring * (len(meeting_id) // i) == meeting_id:
-            return False
-
-    if len(set(meeting_id)) < 4:
         return False
 
     return True
