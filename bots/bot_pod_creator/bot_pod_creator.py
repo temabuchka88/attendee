@@ -50,8 +50,7 @@ class BotPodCreator:
 
         # Set the command based on bot_id
         # Run entrypoint script first, then the bot command
-        bot_cmd = f"python manage.py run_bot --botid {bot_id}"
-        command = [bot_cmd]
+        command = ["python", "manage.py", "run_bot", "--botid", str(bot_id)]
 
         # Metadata labels matching the deployment
         labels = {
@@ -105,7 +104,7 @@ class BotPodCreator:
                 name="webpage-streamer",
                 image=self.image,
                 image_pull_policy="Always",
-                command=["python bots/webpage_streamer/run_webpage_streamer.py"],
+                command=["python", "bots/webpage_streamer/run_webpage_streamer.py"],
                 resources=client.V1ResourceRequirements(
                     requests={
                         "cpu": os.getenv("WEBPAGE_STREAMING_CPU_REQUEST", "1"),
