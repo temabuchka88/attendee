@@ -51,7 +51,7 @@ class BotPodCreator:
         # Set the command based on bot_id
         # Run entrypoint script first, then the bot command
         bot_cmd = f"python manage.py run_bot --botid {bot_id}"
-        command = ["/bin/bash", "-c", f"/opt/bin/entrypoint.sh && {bot_cmd}"]
+        command = bot_cmd
 
         # Metadata labels matching the deployment
         labels = {
@@ -105,7 +105,7 @@ class BotPodCreator:
                 name="webpage-streamer",
                 image=self.image,
                 image_pull_policy="Always",
-                command=["/bin/bash", "-c", "/opt/bin/entrypoint.sh && python bots/webpage_streamer/run_webpage_streamer.py"],
+                command="python bots/webpage_streamer/run_webpage_streamer.py",
                 resources=client.V1ResourceRequirements(
                     requests={
                         "cpu": os.getenv("WEBPAGE_STREAMING_CPU_REQUEST", "1"),
@@ -121,8 +121,18 @@ class BotPodCreator:
                     client.V1EnvVar(
                         name="DJANGO_SETTINGS_MODULE",
                         value=os.getenv("DJANGO_SETTINGS_MODULE")
-                    )
-                ] if os.getenv("DJANGO_SETTINGS_MODULE") else [],
+                    ),
+                    client.V1EnvVar(name="ALSA_CONFIG_PATH", value="/tmp/asoundrc"),
+                ],
+                security_context = client.V1SecurityContext(
+                    run_as_non_root=True,
+                    run_as_user=1000,                 # matches image USER app
+                    run_as_group=1000,                # keep file perms consistent
+                    read_only_root_filesystem=True,
+                    allow_privilege_escalation=False,
+                    capabilities=client.V1Capabilities(drop=["ALL"]),
+                    seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
+                )                
             )
 
         containers = [bot_container] if not add_webpage_streamer else [bot_container, webpage_streamer_container]
