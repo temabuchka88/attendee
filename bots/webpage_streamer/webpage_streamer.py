@@ -173,8 +173,7 @@ class WebpageStreamer(BotAdapter):
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
         finally:
-            # Force exit the process
-            sys.exit(1)
+            sys.exit(0)
 
     def load_webapp(self):
         pcs = set()
@@ -337,12 +336,48 @@ class WebpageStreamer(BotAdapter):
 
         app = web.Application()
 
+        # Add CORS handling for preflight requests
+        async def handle_cors_preflight(request):
+            """Handle CORS preflight requests"""
+            return web.Response(
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type",
+                    "Access-Control-Max-Age": "86400",
+                }
+            )
+
+        # Add CORS headers to all responses
+        @web.middleware
+        async def add_cors_headers(request, handler):
+            """Add CORS headers to all responses"""
+            response = await handler(request)
+            response.headers.update(
+                {
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type",
+                }
+            )
+            return response
+
+        app.middlewares.append(add_cors_headers)
+
         app.router.add_post("/start_streaming", start_streaming)
+        
         app.router.add_post("/keepalive", keepalive)
+        app.router.add_options("/keepalive", handle_cors_preflight)
+
         app.router.add_post("/shutdown", shutdown)
+        app.router.add_options("/shutdown", handle_cors_preflight)
 
         app.router.add_post("/offer", offer)
+        app.router.add_options("/offer", handle_cors_preflight)
+
         app.router.add_post("/offer_meeting_audio", offer_meeting_audio)  # SDP exchange
+        app.router.add_options("/offer_meeting_audio", handle_cors_preflight)
+
 
         app["video_player"] = video_player
         app["audio_player"] = audio_player

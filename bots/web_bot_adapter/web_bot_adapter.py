@@ -755,8 +755,11 @@ class WebBotAdapter(BotAdapter):
         logger.info("Keepalive task stopped")
 
     def send_webpage_streamer_shutdown_request(self):
-        response = requests.post(f"http://{self.streaming_service_hostname()}:8000/shutdown", json={})
-        logger.info(f"Shutdown response: {response.json()}")
+        try:
+            response = requests.post(f"http://{self.streaming_service_hostname()}:8000/shutdown", json={})
+            logger.info(f"Shutdown response: {response.json()}")
+        except Exception as e:
+            logger.warning(f"Failed to send shutdown request: {e}")
 
     def start_streaming_from_webpage(self):
         if not self.voice_agent_url:
