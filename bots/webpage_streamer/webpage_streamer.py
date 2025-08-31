@@ -299,7 +299,7 @@ class WebpageStreamer(BotAdapter):
         async def shutdown(req):
             """Shutdown endpoint to gracefully shutdown the process."""
             logger.info("Shutting down process")
-            await self.shutdown_process()
+            #await self.shutdown_process()
             return web.json_response({"status": "success"})
 
         video_size = f"{self.video_frame_size[0]}x{self.video_frame_size[1]}"
