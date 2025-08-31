@@ -746,20 +746,20 @@ class WebBotAdapter(BotAdapter):
                     break
 
                 response = requests.post(f"http://{self.streaming_service_hostname()}:8000/keepalive", json={})
-                logger.debug(f"Keepalive response: {response.status_code}")
+                logger.info(f"Webpage streamer keepalive response: {response.status_code}")
 
             except Exception as e:
-                logger.warning(f"Failed to send keepalive: {e}")
+                logger.info(f"Failed to send webpage streamer keepalive: {e}")
                 # Continue the loop even if a single keepalive fails
 
-        logger.info("Keepalive task stopped")
+        logger.info("Webpage streamer keepalive task stopped")
 
     def send_webpage_streamer_shutdown_request(self):
         try:
             response = requests.post(f"http://{self.streaming_service_hostname()}:8000/shutdown", json={})
-            logger.info(f"Shutdown response: {response.json()}")
+            logger.info(f"Webpage streamer shutdown response: {response.json()}")
         except Exception as e:
-            logger.warning(f"Failed to send shutdown request: {e}")
+            logger.info(f"Webpage streamer shutdown response: {e}")
 
     def start_streaming_from_webpage(self):
         if not self.voice_agent_url:
@@ -780,7 +780,7 @@ class WebBotAdapter(BotAdapter):
         logger.info(f"Start streaming response: {start_streaming_response}")
 
         if start_streaming_response.status_code != 200:
-            logger.warning(f"Failed to start streaming, not starting keepalive task. Response: {start_streaming_response.status_code}")
+            logger.info(f"Failed to start streaming, not starting webpage streamer keepalive task. Response: {start_streaming_response.status_code}")
             return
 
         # Start the keepalive task after successful streaming start
