@@ -47,7 +47,7 @@ services:
       - "8001:8000"
     environment:
       - DJANGO_SETTINGS_MODULE=attendee.settings.development
-    command: ["/bin/bash", "-c", "/opt/bin/entrypoint.sh && python manage.py stream_webpage"]
+    command: ["/bin/bash", "-c", "/opt/bin/entrypoint.sh && python bots/webpage_streamer/run_webpage_streamer.py"]
 
 
   postgres:

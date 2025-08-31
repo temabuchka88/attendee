@@ -2,8 +2,6 @@ import logging
 
 from selenium import webdriver
 
-from bots.bot_adapter import BotAdapter
-
 logger = logging.getLogger(__name__)
 
 import asyncio
@@ -86,7 +84,7 @@ class AlsaLoopbackSink:
         pass
 
 
-class WebpageStreamer(BotAdapter):
+class WebpageStreamer:
     def __init__(
         self,
     ):
