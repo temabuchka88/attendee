@@ -2514,7 +2514,7 @@ class BotOutputManager {
                 type: 'BOT_OUTPUT_PEER_CONNECTION_STATS',
                 logStatement: logStatement
             });
-        }, 2000);
+        }, 60000);
     }
 }
 

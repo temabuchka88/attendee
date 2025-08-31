@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 
 import asyncio
 import os
+import sys
+import time
 
 import numpy as np
 from aiohttp import web
@@ -92,6 +94,8 @@ class WebpageStreamer(BotAdapter):
         self.video_frame_size = (640, 480)
         self.display_var_for_recording = None
         self.display = None
+        self.last_keepalive_time = None
+        self.keepalive_monitor_task = None
 
     def run(self):
         self.display_var_for_recording = os.environ.get("DISPLAY")
@@ -140,6 +144,37 @@ class WebpageStreamer(BotAdapter):
         self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": combined_code})
 
         self.load_webapp()
+
+    async def keepalive_monitor(self):
+        """Monitor keepalive status and shutdown if no keepalive received in the last minute."""
+        while True:
+            await asyncio.sleep(60)  # Check every minute
+
+            if self.last_keepalive_time is None:
+                # No keepalive has been called yet, continue monitoring
+                continue
+
+            current_time = time.time()
+            time_since_last_keepalive = current_time - self.last_keepalive_time
+
+            if time_since_last_keepalive > 180:  # More than 3 minutes since last keepalive
+                logger.warning(f"No keepalive received in {time_since_last_keepalive:.1f} seconds. Shutting down process.")
+                await self.shutdown_process()
+                break
+
+    async def shutdown_process(self):
+        """Gracefully shutdown the process."""
+        try:
+            if self.driver:
+                self.driver.quit()
+            if self.display:
+                self.display.stop()
+            logger.info("Process shutting down due to keepalive timeout")
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
+        finally:
+            # Force exit the process
+            sys.exit(1)
 
     def load_webapp(self):
         pcs = set()
@@ -248,6 +283,24 @@ class WebpageStreamer(BotAdapter):
 
             print(f"Starting streaming to {webpage_url}")
             self.driver.get(webpage_url)
+
+            # Start keepalive monitoring
+            if self.keepalive_monitor_task is None or self.keepalive_monitor_task.done():
+                self.keepalive_monitor_task = asyncio.create_task(self.keepalive_monitor())
+                logger.info("Started keepalive monitoring task")
+
+            return web.json_response({"status": "success"})
+
+        async def keepalive(req):
+            """Keepalive endpoint to reset the timeout timer."""
+            self.last_keepalive_time = time.time()
+            logger.debug("Keepalive received")
+            return web.json_response({"status": "alive", "timestamp": self.last_keepalive_time})
+
+        async def shutdown(req):
+            """Shutdown endpoint to gracefully shutdown the process."""
+            logger.info("Shutting down process")
+            await self.shutdown_process()
             return web.json_response({"status": "success"})
 
         video_size = f"{self.video_frame_size[0]}x{self.video_frame_size[1]}"
@@ -284,40 +337,12 @@ class WebpageStreamer(BotAdapter):
 
         app = web.Application()
 
-        # Add CORS handling for preflight requests
-        async def handle_cors_preflight(request):
-            """Handle CORS preflight requests"""
-            return web.Response(
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-                    "Access-Control-Allow-Headers": "Content-Type",
-                    "Access-Control-Max-Age": "86400",
-                }
-            )
-
-        # Add CORS headers to all responses
-        @web.middleware
-        async def add_cors_headers(request, handler):
-            """Add CORS headers to all responses"""
-            response = await handler(request)
-            response.headers.update(
-                {
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-                    "Access-Control-Allow-Headers": "Content-Type",
-                }
-            )
-            return response
-
-        app.middlewares.append(add_cors_headers)
-
         app.router.add_post("/start_streaming", start_streaming)
-        app.router.add_post("/offer", offer)
-        app.router.add_options("/offer", handle_cors_preflight)
+        app.router.add_post("/keepalive", keepalive)
+        app.router.add_post("/shutdown", shutdown)
 
+        app.router.add_post("/offer", offer)
         app.router.add_post("/offer_meeting_audio", offer_meeting_audio)  # SDP exchange
-        app.router.add_options("/offer_meeting_audio", handle_cors_preflight)
 
         app["video_player"] = video_player
         app["audio_player"] = audio_player

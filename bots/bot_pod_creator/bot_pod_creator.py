@@ -67,6 +67,8 @@ class BotPodCreator:
             annotations["karpenter.sh/do-not-disrupt"] = "true"
             annotations["karpenter.sh/do-not-evict"] = "true"
 
+        bot_container_ephemeral_storage_request = os.getenv("BOT_EPHEMERAL_STORAGE_REQUEST", "10Gi") if not add_webpage_streamer else os.getenv("BOT_EPHEMERAL_STORAGE_REQUEST_IF_WEBPAGE_STREAMER", "9.5Gi")
+
         bot_container = client.V1Container(
                         name="bot-proc",
                         image=self.image,
@@ -76,11 +78,11 @@ class BotPodCreator:
                             requests={
                                 "cpu": bot_cpu_request,
                                 "memory": os.getenv("BOT_MEMORY_REQUEST", "4Gi"),
-                                "ephemeral-storage": os.getenv("BOT_EPHEMERAL_STORAGE_REQUEST", "9.5Gi")
+                                "ephemeral-storage": bot_container_ephemeral_storage_request
                             },
                             limits={
                                 "memory": os.getenv("BOT_MEMORY_LIMIT", "4Gi"),
-                                "ephemeral-storage": os.getenv("BOT_EPHEMERAL_STORAGE_LIMIT", "9.5Gi")
+                                "ephemeral-storage": bot_container_ephemeral_storage_request
                             }
                         ),
                         env_from=[
@@ -103,7 +105,7 @@ class BotPodCreator:
                 name="webpage-streamer",
                 image=self.image,
                 image_pull_policy="Always",
-                command=["/bin/bash", "-c", f"/opt/bin/entrypoint.sh && python manage.py stream_webpage"],
+                command=["/bin/bash", "-c", "/opt/bin/entrypoint.sh && python manage.py stream_webpage"],
                 resources=client.V1ResourceRequirements(
                     requests={
                         "cpu": os.getenv("WEBPAGE_STREAMING_CPU_REQUEST", "1"),
