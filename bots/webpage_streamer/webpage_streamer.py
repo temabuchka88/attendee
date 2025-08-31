@@ -147,12 +147,11 @@ class WebpageStreamer(BotAdapter):
 
     async def keepalive_monitor(self):
         """Monitor keepalive status and shutdown if no keepalive received in the last minute."""
+
+        self.last_keepalive_time = time.time()
+
         while True:
             await asyncio.sleep(60)  # Check every minute
-
-            if self.last_keepalive_time is None:
-                # No keepalive has been called yet, continue monitoring
-                continue
 
             current_time = time.time()
             time_since_last_keepalive = current_time - self.last_keepalive_time
