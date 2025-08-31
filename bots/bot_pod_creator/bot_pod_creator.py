@@ -76,11 +76,11 @@ class BotPodCreator:
                             requests={
                                 "cpu": bot_cpu_request,
                                 "memory": os.getenv("BOT_MEMORY_REQUEST", "4Gi"),
-                                "ephemeral-storage": os.getenv("BOT_EPHEMERAL_STORAGE_REQUEST", "10Gi")
+                                "ephemeral-storage": os.getenv("BOT_EPHEMERAL_STORAGE_REQUEST", "9.5Gi")
                             },
                             limits={
                                 "memory": os.getenv("BOT_MEMORY_LIMIT", "4Gi"),
-                                "ephemeral-storage": os.getenv("BOT_EPHEMERAL_STORAGE_LIMIT", "10Gi")
+                                "ephemeral-storage": os.getenv("BOT_EPHEMERAL_STORAGE_LIMIT", "9.5Gi")
                             }
                         ),
                         env_from=[
@@ -108,11 +108,11 @@ class BotPodCreator:
                     requests={
                         "cpu": os.getenv("WEBPAGE_STREAMING_CPU_REQUEST", "1"),
                         "memory": os.getenv("WEBPAGE_STREAMING_MEMORY_REQUEST", "4Gi"),
-                        "ephemeral-storage": os.getenv("WEBPAGE_STREAMING_EPHEMERAL_STORAGE_REQUEST", "0Gi")
+                        "ephemeral-storage": os.getenv("WEBPAGE_STREAMING_EPHEMERAL_STORAGE_REQUEST", "0.5Gi")
                     },
                     limits={
                         "memory": os.getenv("WEBPAGE_STREAMING_MEMORY_LIMIT", "4Gi"),
-                        "ephemeral-storage": os.getenv("WEBPAGE_STREAMING_EPHEMERAL_STORAGE_LIMIT", "0Gi")
+                        "ephemeral-storage": os.getenv("WEBPAGE_STREAMING_EPHEMERAL_STORAGE_LIMIT", "0.5Gi")
                     }
                 ),
                 env_from=[
