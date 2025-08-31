@@ -514,6 +514,9 @@ class Bot(models.Model):
         websocket_audio_settings = websocket_settings.get("audio") or {}
         return websocket_audio_settings.get("sample_rate", 16000)
 
+    def voice_agent_url(self):
+        return self.settings.get("voice_agent_settings", {}).get("url", None)
+
     def zoom_tokens_callback_url(self):
         callback_settings = self.settings.get("callback_settings", {})
         if callback_settings is None:

@@ -273,23 +273,10 @@ class WebBotAdapter(BotAdapter):
             body = json_data.get("body")
 
             # Make the HTTP request
-            response = requests.request(
-                method=method,
-                url=url,
-                headers=headers,
-                data=body,
-                timeout=30
-            )
+            response = requests.request(method=method, url=url, headers=headers, data=body, timeout=30)
 
             # Send response back to browser
-            response_data = {
-                "type": "HttpProxyResponse",
-                "request_id": request_id,
-                "status": response.status_code,
-                "statusText": response.reason,
-                "headers": dict(response.headers),
-                "body": response.text
-            }
+            response_data = {"type": "HttpProxyResponse", "request_id": request_id, "status": response.status_code, "statusText": response.reason, "headers": dict(response.headers), "body": response.text}
 
             # Send JSON response back through websocket
             message = json.dumps(response_data).encode("utf-8")
@@ -299,13 +286,7 @@ class WebBotAdapter(BotAdapter):
         except Exception as e:
             logger.exception(f"Error in HTTP proxy request: {e}")
             # Send error response back to browser
-            error_response = {
-                "type": "HttpProxyResponse",
-                "request_id": json_data.get("request_id"),
-                "error": str(e),
-                "status": 500,
-                "statusText": "Proxy Error"
-            }
+            error_response = {"type": "HttpProxyResponse", "request_id": json_data.get("request_id"), "error": str(e), "status": 500, "statusText": "Proxy Error"}
 
             message = json.dumps(error_response).encode("utf-8")
             full_message = (1).to_bytes(4, byteorder="little") + message

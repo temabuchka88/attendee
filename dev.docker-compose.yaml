@@ -37,6 +37,19 @@ services:
       - DJANGO_SETTINGS_MODULE=attendee.settings.development
     command: python manage.py runserver 0.0.0.0:8000
 
+  attendee-webpage-streamer-local:
+    build: ./
+    volumes:
+     - .:/attendee
+    networks:
+      - attendee_network
+    ports:
+      - "8001:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=attendee.settings.development
+    command: ["/bin/bash", "-c", "/opt/bin/entrypoint.sh && python manage.py stream_webpage"]
+
+
   postgres:
     image: postgres:15.3-alpine
     environment:

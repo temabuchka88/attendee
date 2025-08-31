@@ -2645,6 +2645,7 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
     await window.httpProxy.fetch('http://attendee-webpage-streamer-local:8000/start_streaming', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ url: "" })
       });
 
     }
