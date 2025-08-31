@@ -730,6 +730,9 @@ class WebBotAdapter(BotAdapter):
         logger.info(f"Start streaming from webpage: {self.voice_agent_url}")
         peerConnectionOffer = self.driver.execute_script("return window.botOutputManager.getBotOutputPeerConnectionOffer();")
         logger.info(f"Peer connection offer: {peerConnectionOffer}")
+        if peerConnectionOffer.get("error"):
+            logger.error(f"Error getting peer connection offer: {peerConnectionOffer.get('error')}, returning")
+            return
 
         offer_response = requests.post("http://attendee-webpage-streamer-local:8000/offer", json={"sdp": peerConnectionOffer["sdp"], "type": peerConnectionOffer["type"]})
         logger.info(f"Offer response: {offer_response.json()}")

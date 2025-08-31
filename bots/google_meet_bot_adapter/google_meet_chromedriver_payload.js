@@ -2478,6 +2478,43 @@ class BotOutputManager {
 
     async startBotOutputPeerConnection(offerResponse) {
         await this.botOutputPeerConnection.setRemoteDescription(offerResponse);
+        
+        // Start latency measurement for the bot output peer connection
+        this.startLatencyMeter(this.botOutputPeerConnection, "bot-output");
+    }
+
+    startLatencyMeter(pc, label="rx") {
+        setInterval(async () => {
+            const stats = await pc.getStats();
+            let rtt_ms = 0, jb_a_ms = 0, jb_v_ms = 0, dec_v_ms = 0;
+
+            stats.forEach(r => {
+                if (r.type === 'candidate-pair' && r.state === 'succeeded' && r.nominated) {
+                    rtt_ms = (r.currentRoundTripTime || 0) * 1000;
+                }
+                if (r.type === 'inbound-rtp' && r.kind === 'audio') {
+                    const d = (r.jitterBufferDelay || 0);
+                    const n = (r.jitterBufferEmittedCount || 1);
+                    jb_a_ms = (d / n) * 1000;
+                }
+                if (r.type === 'inbound-rtp' && r.kind === 'video') {
+                    const d = (r.jitterBufferDelay || 0);
+                    const n = (r.jitterBufferEmittedCount || 1);
+                    jb_v_ms = (d / n) * 1000;
+                    dec_v_ms = ((r.totalDecodeTime || 0) / (r.framesDecoded || 1)) * 1000;
+                }
+            });
+
+            const est_audio_owd = (rtt_ms / 2) + jb_a_ms;
+            const est_video_owd = (rtt_ms / 2) + jb_v_ms + dec_v_ms;
+
+            const logStatement = `[${label}] est one-way: audio≈${est_audio_owd|0}ms, video≈${est_video_owd|0}ms  (rtt=${rtt_ms|0}, jb_a=${jb_a_ms|0}, jb_v=${jb_v_ms|0}, dec_v=${dec_v_ms|0})`;
+            console.log(logStatement);
+            window.ws.sendJson({
+                type: 'BOT_OUTPUT_PEER_CONNECTION_STATS',
+                logStatement: logStatement
+            });
+        }, 2000);
     }
 }
 
@@ -2525,12 +2562,12 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
         }
 
         if (botOutputManager.botOutputMediaStream) {
-            // connect the special stream to the audio context
+            // connect the botOutputMediaStream stream to the audio context
             if (botOutputManager.botOutputMediaStream.getAudioTracks().length > 0) {
                 botOutputManager.initializeBotOutputAudioTrack();
                 const botOutputMediaStreamSource = botOutputManager.audioContextForBotOutput.createMediaStreamSource(botOutputManager.botOutputMediaStream);
                 botOutputMediaStreamSource.connect(botOutputManager.gainNode);
-                console.log("Connected special stream audio track to audio context");
+                console.log("Connected botOutputMediaStream audio track to audio context");
             }
         }
   

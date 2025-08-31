@@ -16,123 +16,7 @@ from aiortc.contrib.media import MediaPlayer, MediaRelay
 from av.audio.frame import AudioFrame
 from pyvirtualdisplay import Display
 
-PUMP_HTML = """<!doctype html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<title>Pumped Audio Player</title>
-<style>body{font-family:system-ui;margin:2rem} audio{width:100%}</style>
-</head>
-<body>
-<h1>Pumped Audio (listen-only)</h1>
-<p>This page subscribes to the upstream audio captured by the other client.</p>
-<button id="start">Start</button>
-<audio id="a" autoplay controls></audio>
-
-<script>
-const startBtn = document.getElementById('start');
-const audioEl  = document.getElementById('a');
-
-startBtn.onclick = async () => {
-startBtn.disabled = true;
-
-const pc = new RTCPeerConnection();
-
-// When server sends audio, play it.
-const ms = new MediaStream();
-pc.ontrack = (ev) => {
-    ms.addTrack(ev.track);
-    audioEl.srcObject = ms;
-    try { audioEl.play(); } catch(e) { console.error(e); }
-};
-
-// We only want to RECEIVE audio
-pc.addTransceiver('audio', { direction: 'recvonly' });
-
-const offer = await pc.createOffer();
-await pc.setLocalDescription(offer);
-
-const res = await fetch('http://localhost:8000/offer_pump_audio', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
-});
-
-if (!res.ok) {
-    const t = await res.text();
-    alert('No upstream audio yet (or error): ' + t);
-    startBtn.disabled = false;
-    return;
-}
-
-const answer = await res.json();
-await pc.setRemoteDescription(answer);
-};
-</script>
-</body>
-</html>
-"""
-
-INDEX_HTML = """<!doctype html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<title>Local WebRTC: Webcam + Mic</title>
-<style>body{font-family:system-ui;margin:2rem} video{width:100%;max-width:960px;background:#000;border-radius:12px}</style>
-</head>
-<body>
-<h1>Local WebRTC (webcam + microphone)</h1>
-<p>Click start to receive the live stream from this machine.</p>
-<button id="start">Start</button>
-<video id="v" playsinline controls></video>
-
-<script>
-const startBtn = document.getElementById('start');
-const videoEl  = document.getElementById('v');
-
-startBtn.onclick = async () => {
-startBtn.disabled = true;
-
-// 1) Ask for the user's microphone
-const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-// 2) Create the RTCPeerConnection
-const pc = new RTCPeerConnection();
-
-// 3) Receive the server's *video* (to preview) and optionally server audio
-const ms = new MediaStream();
-pc.ontrack = (ev) => {
-    ms.addTrack(ev.track);
-    videoEl.srcObject = ms;
-};
-
-// We still want to receive the server's video
-pc.addTransceiver('video', { direction: 'recvonly' });
-
-// ❗ Instead of recvonly audio, we now **send** our mic upstream:
-for (const track of micStream.getAudioTracks()) {
-    pc.addTrack(track, micStream);
-}
-
-// Create/POST offer → set remote answer
-const offer = await pc.createOffer();
-await pc.setLocalDescription(offer);
-const res = await fetch('/offer', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
-});
-const answer = await res.json();
-await pc.setRemoteDescription(answer);
-
-videoEl.muted = false;
-videoEl.volume = 1.0;
-try { await videoEl.play(); } catch (e) { console.error(e); }
-};
-</script>
-</body>
-</html>
-"""
+os.environ["PULSE_LATENCY_MSEC"] = "20"
 
 
 def audioframe_to_s16le_bytes(frame: AudioFrame, target_channels=2):
@@ -205,7 +89,7 @@ class WebpageStreamer(BotAdapter):
         self,
     ):
         self.driver = None
-        self.video_frame_size = (1280, 720)
+        self.video_frame_size = (640, 480)
         self.display_var_for_recording = None
         self.display = None
 
@@ -213,7 +97,7 @@ class WebpageStreamer(BotAdapter):
         self.display_var_for_recording = os.environ.get("DISPLAY")
         if os.environ.get("DISPLAY") is None:
             # Create virtual display only if no real display is available
-            self.display = Display(visible=0, size=(1280, 720))
+            self.display = Display(visible=0, size=self.video_frame_size)
             self.display.start()
             self.display_var_for_recording = self.display.new_display_var
 
@@ -258,9 +142,6 @@ class WebpageStreamer(BotAdapter):
         self.load_webapp()
 
     def load_webapp(self):
-        async def index(_req):
-            return web.Response(text=INDEX_HTML, content_type="text/html")
-
         pcs = set()
 
         # ADD THESE TWO LINES
@@ -268,10 +149,6 @@ class WebpageStreamer(BotAdapter):
         # will hold the *original* upstream AudioStreamTrack
         # from the first client that posts to /offer
         UPSTREAM_AUDIO_TRACK_KEY = "upstream_audio_track"
-
-        async def pump_page(_req):
-            # GET /offer_pump_audio -> returns the listener page
-            return web.Response(text=PUMP_HTML, content_type="text/html")
 
         async def offer_pump_audio(req):
             """
@@ -317,10 +194,27 @@ class WebpageStreamer(BotAdapter):
             a_player = req.app["audio_player"]
 
             if v_player and v_player.video:
-                pc.addTrack(v_player.video)
+                v_sender = pc.addTrack(v_player.video)
+                # Hint the encoder for real-time, modest bitrate, no B-frames
+                try:
+                    params = v_sender.getParameters()
+                    # Keep one encoding, cap bitrate to avoid queue build-up
+                    params.encodings = [{"maxBitrate": 1_500_000, "maxFramerate": 15}]
+                    v_sender.setParameters(params)
+                except Exception:
+                    pass
+
             # You can still send server audio if you want the page to hear server audio too:
             if a_player and a_player.audio:
-                pc.addTrack(a_player.audio)
+                a_sender = pc.addTrack(a_player.audio)
+                # Hint the encoder for real-time, modest bitrate, no B-frames
+                try:
+                    params = a_sender.getParameters()
+                    # Keep one encoding, cap bitrate to avoid queue build-up
+                    params.encodings = [{"maxBitrate": 64_000, "maxFramerate": 15}]
+                    a_sender.setParameters(params)
+                except Exception:
+                    pass
 
             # --- NEW: receive client's mic and feed to ALSA loopback ---
             # loopback_sink = AlsaLoopbackSink(device="hw:Loopback,0,0", sample_rate=48000, channels=2)
@@ -356,13 +250,13 @@ class WebpageStreamer(BotAdapter):
             self.driver.get(webpage_url)
             return web.json_response({"status": "success"})
 
-        video_size = "1280x720"
-        framerate = "30"
+        video_size = f"{self.video_frame_size[0]}x{self.video_frame_size[1]}"
+        framerate = "15"
         video_device = self.display.new_display_var
         video_format = "x11grab"
 
         audio_device = "default"
-        audio_format = "alsa"
+        audio_format = "pulse"
 
         port = 8000
 
@@ -371,11 +265,22 @@ class WebpageStreamer(BotAdapter):
         v_opts = {
             "video_size": video_size,
             "framerate": framerate,
+            "fflags": "nobuffer",
+            "flags": "low_delay",
+            "probesize": "32",
+            "analyzeduration": "0",
+            "thread_queue_size": "64",
         }
         video_player = MediaPlayer(video_device, format=video_format, options=v_opts)
 
         # Audio player: let aiortc/ffmpeg handle resampling to 48k
-        audio_player = MediaPlayer(audio_device, format=audio_format)
+        a_opts = {
+            "fflags": "nobuffer",
+            "probesize": "32",
+            "analyzeduration": "0",
+            "thread_queue_size": "64",
+        }
+        audio_player = MediaPlayer(audio_device, format=audio_format, options=a_opts)
 
         app = web.Application()
 
@@ -408,11 +313,9 @@ class WebpageStreamer(BotAdapter):
         app.middlewares.append(add_cors_headers)
 
         app.router.add_post("/start_streaming", start_streaming)
-        app.router.add_get("/", index)
         app.router.add_post("/offer", offer)
         app.router.add_options("/offer", handle_cors_preflight)
 
-        app.router.add_get("/offer_pump_audio", pump_page)  # serves the HTML player
         app.router.add_post("/offer_pump_audio", offer_pump_audio)  # SDP exchange
         app.router.add_options("/offer_pump_audio", handle_cors_preflight)
 
