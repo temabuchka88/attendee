@@ -351,7 +351,7 @@ class WebpageStreamer(BotAdapter):
             webpage_url = data.get("url")
             if not webpage_url:
                 return web.json_response({"error": "URL is required"}, status=400)
-            
+
             print(f"Starting streaming to {webpage_url}")
             self.driver.get(webpage_url)
             return web.json_response({"status": "success"})

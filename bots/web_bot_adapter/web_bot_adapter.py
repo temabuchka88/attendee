@@ -255,46 +255,6 @@ class WebBotAdapter(BotAdapter):
 
         self.upsert_chat_message_callback(json_data)
 
-    def handle_http_proxy_request(self, json_data, websocket):
-        """
-        Handle HTTP proxy requests from the browser to bypass CORS restrictions.
-        Expected json_data format:
-        {
-            "type": "HttpProxyRequest",
-            "request_id": "unique_id",
-            "url": "https://example.com/api",
-            "method": "POST",
-            "headers": {"Content-Type": "application/json"},
-            "body": "request body"
-        }
-        """
-        try:
-            request_id = json_data.get("request_id")
-            url = json_data.get("url")
-            method = json_data.get("method", "GET")
-            headers = json_data.get("headers", {})
-            body = json_data.get("body")
-
-            # Make the HTTP request
-            response = requests.request(method=method, url=url, headers=headers, data=body, timeout=30)
-
-            # Send response back to browser
-            response_data = {"type": "HttpProxyResponse", "request_id": request_id, "status": response.status_code, "statusText": response.reason, "headers": dict(response.headers), "body": response.text}
-
-            # Send JSON response back through websocket
-            message = json.dumps(response_data).encode("utf-8")
-            full_message = (1).to_bytes(4, byteorder="little") + message
-            websocket.send(full_message)
-
-        except Exception as e:
-            logger.exception(f"Error in HTTP proxy request: {e}")
-            # Send error response back to browser
-            error_response = {"type": "HttpProxyResponse", "request_id": json_data.get("request_id"), "error": str(e), "status": 500, "statusText": "Proxy Error"}
-
-            message = json.dumps(error_response).encode("utf-8")
-            full_message = (1).to_bytes(4, byteorder="little") + message
-            websocket.send(full_message)
-
     def handle_websocket(self, websocket):
         audio_format = None
         output_dir = "frames"  # Add output directory
@@ -361,9 +321,6 @@ class WebBotAdapter(BotAdapter):
                         elif json_data.get("type") == "RecordingPermissionChange":
                             if json_data.get("change") == "granted":
                                 self.after_bot_can_record_meeting()
-
-                        elif json_data.get("type") == "HttpProxyRequest":
-                            self.handle_http_proxy_request(json_data, websocket)
 
                 elif message_type == 2:  # VIDEO
                     self.process_video_frame(message)

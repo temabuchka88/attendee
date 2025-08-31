@@ -28,94 +28,6 @@ function sendChatMessage(text) {
     return true;
 }
 
-// HTTP Proxy function to bypass CORS restrictions
-class HttpProxy {
-    constructor() {
-        this.pendingRequests = new Map();
-        this.requestIdCounter = 0;
-    }
-
-    async fetch(url, options = {}) {
-        return new Promise((resolve, reject) => {
-            const requestId = `req_${this.requestIdCounter++}_${Date.now()}`;
-            
-            // Store the promise resolvers
-            this.pendingRequests.set(requestId, { resolve, reject });
-
-            // Send the request through websocket
-            window.ws.sendJson({
-                type: 'HttpProxyRequest',
-                request_id: requestId,
-                url: url,
-                method: options.method || 'GET',
-                headers: options.headers || {},
-                body: options.body || null
-            });
-
-            // Set a timeout to prevent hanging requests
-            setTimeout(() => {
-                if (this.pendingRequests.has(requestId)) {
-                    this.pendingRequests.delete(requestId);
-                    reject(new Error('Proxy request timeout'));
-                }
-            }, 30000);
-        });
-    }
-
-    handleResponse(responseData) {
-        const requestId = responseData.request_id;
-        const pendingRequest = this.pendingRequests.get(requestId);
-        
-        if (!pendingRequest) {
-            console.warn('Received response for unknown request:', requestId);
-            return;
-        }
-
-        this.pendingRequests.delete(requestId);
-
-        if (responseData.error) {
-            pendingRequest.reject(new Error(responseData.error));
-        } else {
-            // Create a fetch-like response object
-            const response = {
-                ok: responseData.status >= 200 && responseData.status < 300,
-                status: responseData.status,
-                statusText: responseData.statusText,
-                headers: responseData.headers,
-                text: () => Promise.resolve(responseData.body),
-                json: () => Promise.resolve(JSON.parse(responseData.body))
-            };
-            pendingRequest.resolve(response);
-        }
-    }
-}
-
-// Create global HTTP proxy instance
-window.httpProxy = new HttpProxy();
-
-// Example usage function for testing the proxy
-window.testHttpProxy = async function() {
-    try {
-        console.log('Testing HTTP proxy...');
-        const response = await window.httpProxy.fetch('https://httpbin.org/get', {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            console.log('Proxy test successful:', data);
-            return data;
-        } else {
-            console.error('Proxy test failed:', response.status, response.statusText);
-        }
-    } catch (error) {
-        console.error('Proxy test error:', error);
-    }
-};
-
 class StyleManager {
     constructor() {
         this.videoTrackIdToSSRC = new Map();
@@ -1112,13 +1024,7 @@ class WebSocketClient {
       switch (messageType) {
           case WebSocketClient.MESSAGE_TYPES.JSON:
               const jsonData = new TextDecoder().decode(new Uint8Array(data, 4));
-              const parsedData = JSON.parse(jsonData);
-              console.log('Received JSON message:', parsedData);
-              
-              // Handle HTTP proxy responses
-              if (parsedData.type === 'HttpProxyResponse') {
-                  window.httpProxy.handleResponse(parsedData);
-              }
+              console.log('Received JSON message:', JSON.parse(jsonData));
               break;
           // Add future message type handlers here
           default:
@@ -2212,17 +2118,17 @@ class BotOutputManager {
         
         turnOffMicAndCamera();
 
-        // after 500 ms
+        // after 1000 ms
         setTimeout(() => {
             turnOnMicAndCamera();
         }, 1000);
     }
 
-    playVideo(videoUrlOrStream) {
+    playVideo(videoUrl) {
         // If camera or mic are on, turn them off
         turnOffMicAndCamera();
 
-        this.addBotOutputVideoElement(videoUrlOrStream);
+        this.addBotOutputVideoElement(videoUrl);
 
         // Add event listener to wait until the video starts playing
         this.botOutputVideoElement.addEventListener('playing', () => {
@@ -2238,7 +2144,7 @@ class BotOutputManager {
         return !!this.botOutputVideoElement;
     }
 
-    addBotOutputVideoElement(urlOrStream) {
+    addBotOutputVideoElement(url) {
         // Disconnect previous video source if it exists
         if (this.videoSoundSource) {
             this.videoSoundSource.disconnect();
@@ -2253,11 +2159,7 @@ class BotOutputManager {
         // Create new video element
         this.botOutputVideoElement = document.createElement('video');
         this.botOutputVideoElement.style.display = 'none';
-        if (typeof urlOrStream === 'string') {
-            this.botOutputVideoElement.src = urlOrStream;
-        } else {
-            this.botOutputVideoElement.srcObject = urlOrStream;
-        }
+        this.botOutputVideoElement.src = url;
         this.botOutputVideoElement.crossOrigin = 'anonymous';
         this.botOutputVideoElement.loop = false;
         this.botOutputVideoElement.autoplay = true;
@@ -2605,7 +2507,7 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
             }
          }
          if (constraints.video && botOutputManager.botOutputMediaStream) {
-            console.log("Adding special stream", botOutputManager.botOutputMediaStream.getVideoTracks()[0]);
+            console.log("Adding botOutputMediaStream", botOutputManager.botOutputMediaStream.getVideoTracks()[0]);
             newStream.addTrack(botOutputManager.botOutputMediaStream.getVideoTracks()[0]);
         }
 
@@ -2639,68 +2541,3 @@ navigator.mediaDevices.getUserMedia = function(constraints) {
         throw err;
       });
   };
-/*
-  async function startStreamingFromWebpage(pureAudioStream) { 
-    try
-    {
-    // 2) Create the RTCPeerConnection
-    const pc = new RTCPeerConnection();
-  
-    // 3) Receive the server's *video* and *audio*
-    const ms = new MediaStream();
-    pc.ontrack = (ev) => {
-      ms.addTrack(ev.track);
-      // If we've received both video and audio, play the stream
-      if (ms.getVideoTracks().length > 0 && ms.getAudioTracks().length > 0) {
-        botOutputManager.playMediaStream(ms);
-      }
-    };
-  
-    // We still want to receive the server's video
-    pc.addTransceiver('video', { direction: 'recvonly' });
-
-    // ❗ Instead of recvonly audio, we now **send** our mic upstream:
-    for (const track of pureAudioStream.getAudioTracks()) {
-        pc.addTrack(track, pureAudioStream);
-    }
-  
-    // Create/POST offer → set remote answer
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    ws.sendJson({
-      type: "start_streaming_from_webpage_offer",
-      sdp: pc.localDescription.sdp,
-      type: pc.localDescription.type
-    });
-    const res = await window.httpProxy.fetch('http://attendee-webpage-streamer-local:8000/offer', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
-    });
-    ws.sendJson({
-      type: "start_streaming_from_webpage_response",
-      status: res.status,
-      statusText: res.statusText,
-      text: await res.text()
-    });
-    const answer = await res.json();
-    await pc.setRemoteDescription(answer);
-
-
-
-    await window.httpProxy.fetch('http://attendee-webpage-streamer-local:8000/start_streaming', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ url: "https://bouncing-ball-test.attendee-website-2.pages.dev/vapi_example?key=f96e993b-5551-4422-8780-2c56ebcdfd6d&assistant=31ecce40-544c-4e40-93f5-b364dac3cc4a" })
-      });
-
-    }
-    catch (e) {
-        ws.sendJson({
-            type: "start_streaming_from_webpage_error",
-            error: e.message
-        });
-    }
-  };
-
-window.startStreamingFromWebpage = startStreamingFromWebpage;*/
