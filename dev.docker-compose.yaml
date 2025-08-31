@@ -9,7 +9,7 @@ services:
       - POSTGRES_HOST=postgres
       - REDIS_URL=redis://redis:6379/5
       - DJANGO_SETTINGS_MODULE=attendee.settings.development
-    command: ["/bin/bash", "-c", "/opt/bin/entrypoint.sh && celery -A attendee worker -l INFO"]
+    command: "celery -A attendee worker -l INFO"
 
   attendee-scheduler-local:
     build: ./
@@ -21,7 +21,7 @@ services:
       - POSTGRES_HOST=postgres
       - REDIS_URL=redis://redis:6379/5
       - DJANGO_SETTINGS_MODULE=attendee.settings.development
-    command: ["/bin/bash", "-c", "/opt/bin/entrypoint.sh && python manage.py run_scheduler"]
+    command: "python manage.py run_scheduler"
 
   attendee-app-local:
     build: ./
@@ -47,7 +47,7 @@ services:
       - "8001:8000"
     environment:
       - DJANGO_SETTINGS_MODULE=attendee.settings.development
-    command: ["/bin/bash", "-c", "/opt/bin/entrypoint.sh && python bots/webpage_streamer/run_webpage_streamer.py"]
+    command: "python bots/webpage_streamer/run_webpage_streamer.py"
 
 
   postgres:
