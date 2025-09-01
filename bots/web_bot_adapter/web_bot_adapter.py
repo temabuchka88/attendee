@@ -259,10 +259,6 @@ class WebBotAdapter(BotAdapter):
 
     def handle_websocket(self, websocket):
         audio_format = None
-        output_dir = "frames"  # Add output directory
-
-        # Create frames directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
 
         try:
             for message in websocket:
