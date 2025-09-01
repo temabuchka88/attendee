@@ -136,7 +136,7 @@ class BotPodCreator:
                     run_as_non_root=True,
                     run_as_user=1000,                 # matches image USER app
                     run_as_group=1000,                # keep file perms consistent
-                    read_only_root_filesystem=True,
+                    #read_only_root_filesystem=True,
                     allow_privilege_escalation=False,
                     capabilities=client.V1Capabilities(drop=["ALL"]),
                     seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
