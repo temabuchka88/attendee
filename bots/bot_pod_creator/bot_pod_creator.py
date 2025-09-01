@@ -182,11 +182,18 @@ class BotPodCreator:
         )
 
         if add_webpage_streamer:
+            # Create specific labels for the webpage streamer pod
+            webpage_streamer_labels = labels.copy()
+            webpage_streamer_labels.update({
+                "app": "webpage-streamer",
+                "bot-id": bot_name
+            })
+            
             webpage_streamer_pod = client.V1Pod(
                 metadata=client.V1ObjectMeta(
                     name=f"{bot_name}-webpage-streamer",
                     namespace=self.namespace,
-                    labels=labels,
+                    labels=webpage_streamer_labels,
                     annotations=annotations
                 ),
                 spec=client.V1PodSpec(
