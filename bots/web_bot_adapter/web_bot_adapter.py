@@ -105,6 +105,7 @@ class WebBotAdapter(BotAdapter):
         self.recording_paused = False
 
         self.voice_agent_url = voice_agent_url
+        self.voice_agent_pod_name = voice_agent_pod_name
 
         self.webpage_streamer_keepalive_task = None
         self.user_data_dir = None
@@ -795,7 +796,7 @@ class WebBotAdapter(BotAdapter):
     def streaming_service_hostname(self):
         # If we're running in k8s, the streaming service will run in another container on the same pod, so we can use localhost
         if os.getenv("LAUNCH_BOT_METHOD") == "kubernetes":
-            return voice_agent_pod_name
+            return self.voice_agent_pod_name
         # Otherwise the streaming service will be running in a separate docker compose service, so we address it using the service name
         return "attendee-webpage-streamer-local"
 
