@@ -72,7 +72,7 @@ class BotPodCreator:
                         name="bot-proc",
                         image=self.image,
                         image_pull_policy="Always",
-                        command=command,
+                        args=command,
                         resources=client.V1ResourceRequirements(
                             requests={
                                 "cpu": bot_cpu_request,
@@ -97,14 +97,23 @@ class BotPodCreator:
                                 )
                             )
                         ],
-                        env=[]
+                        env=[],
+                        security_context = client.V1SecurityContext(
+                            run_as_non_root=True,
+                            run_as_user=1000,                 # matches image USER app
+                            run_as_group=1000,                # keep file perms consistent
+                            read_only_root_filesystem=True,
+                            allow_privilege_escalation=False,
+                            capabilities=client.V1Capabilities(drop=["ALL"]),
+                            seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
+                        ) 
                     )
 
         webpage_streamer_container = client.V1Container(
                 name="webpage-streamer",
                 image=self.image,
                 image_pull_policy="Always",
-                command=["python", "bots/webpage_streamer/run_webpage_streamer.py"],
+                args=["python", "bots/webpage_streamer/run_webpage_streamer.py"],
                 resources=client.V1ResourceRequirements(
                     requests={
                         "cpu": os.getenv("WEBPAGE_STREAMING_CPU_REQUEST", "1"),
@@ -122,7 +131,16 @@ class BotPodCreator:
                         value=os.getenv("DJANGO_SETTINGS_MODULE")
                     ),
                     client.V1EnvVar(name="ALSA_CONFIG_PATH", value="/tmp/asoundrc"),
-                ],               
+                ],
+                security_context = client.V1SecurityContext(
+                    run_as_non_root=True,
+                    run_as_user=1000,                 # matches image USER app
+                    run_as_group=1000,                # keep file perms consistent
+                    read_only_root_filesystem=True,
+                    allow_privilege_escalation=False,
+                    capabilities=client.V1Capabilities(drop=["ALL"]),
+                    seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
+                )                
             )
 
         containers = [bot_container] if not add_webpage_streamer else [bot_container, webpage_streamer_container]
