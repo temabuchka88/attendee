@@ -3,9 +3,13 @@ import datetime
 import json
 import logging
 import os
+import signal
+import shutil
+import subprocess
 import threading
 import time
 from time import sleep
+import uuid
 
 import numpy as np
 import requests
@@ -102,6 +106,7 @@ class WebBotAdapter(BotAdapter):
         self.voice_agent_url = voice_agent_url
 
         self.webpage_streamer_keepalive_task = None
+        self.user_data_dir = None
 
     def pause_recording(self):
         self.recording_paused = True
@@ -413,6 +418,17 @@ class WebBotAdapter(BotAdapter):
         )
 
     def init_driver(self):
+        # Set up signal handlers for graceful shutdown (only works in main thread)
+        try:
+            signal.signal(signal.SIGTERM, self.signal_handler)
+            signal.signal(signal.SIGINT, self.signal_handler)
+            logger.info("Signal handlers registered successfully")
+        except ValueError as e:
+            # This happens when not running in the main thread
+            logger.info(f"Could not register signal handlers (not in main thread): {e}")
+
+        self.cleanup_chrome_processes()
+        self.cleanup_user_data_dir()
         options = webdriver.ChromeOptions()
 
         options.add_argument("--autoplay-policy=no-user-gesture-required")
@@ -420,12 +436,21 @@ class WebBotAdapter(BotAdapter):
         options.add_argument("--use-fake-ui-for-media-stream")
         options.add_argument(f"--window-size={self.video_frame_size[0]},{self.video_frame_size[1]}")
         options.add_argument("--start-fullscreen")
+        
+        # Create a unique user data directory and store it for cleanup
+        self.user_data_dir = f"/tmp/user-data-dir-{uuid.uuid4()}"
+        options.add_argument(f"--user-data-dir={self.user_data_dir}")
         # options.add_argument('--headless=new')
         options.add_argument("--disable-gpu")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-application-cache")
         options.add_argument("--disable-setuid-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--no-sandbox")  # Helps with permission issues
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--force-device-scale-factor=1")
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
@@ -448,8 +473,13 @@ class WebBotAdapter(BotAdapter):
                 logger.info(f"Error closing existing driver: {e}")
             self.driver = None
 
-        self.driver = webdriver.Chrome(options=options)
-        logger.info(f"web driver server initialized at port {self.driver.service.port}")
+        try:
+            self.driver = webdriver.Chrome(options=options)
+            logger.info(f"web driver server initialized at port {self.driver.service.port}")
+        except Exception as e:
+            logger.error(f"Failed to initialize Chrome driver: {e}")
+            self.cleanup_user_data_dir()
+            raise
 
         initial_data_code = f"window.initialData = {{websocketPort: {self.websocket_port}, videoFrameWidth: {self.video_frame_size[0]}, videoFrameHeight: {self.video_frame_size[1]}, botName: {json.dumps(self.display_name)}, addClickRipple: {'true' if self.should_create_debug_recording else 'false'}, recordingView: '{self.recording_view}', sendMixedAudio: {'true' if self.add_mixed_audio_chunk_callback else 'false'}, sendPerParticipantAudio: {'true' if self.add_audio_chunk_callback else 'false'}, collectCaptions: {'false' if self.add_audio_chunk_callback else 'true'}}}"
 
@@ -481,6 +511,38 @@ class WebBotAdapter(BotAdapter):
 
         # Add the combined script to execute on new document
         self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": combined_code})
+
+    def cleanup_chrome_processes(self):
+        """Kill any lingering Chrome processes that might be holding onto user data directories."""
+        try:
+            # Kill Chrome processes that might be using our user data directory pattern
+            subprocess.run(["pkill", "-f", "user-data-dir"], check=False, capture_output=True)
+            logger.info("Cleaned up any existing Chrome processes")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup Chrome processes: {e}")
+
+    def cleanup_user_data_dir(self):
+        """Clean up the user data directory if it exists."""
+        if self.user_data_dir and os.path.exists(self.user_data_dir):
+            try:
+                shutil.rmtree(self.user_data_dir, ignore_errors=True)
+                logger.info(f"Cleaned up user data directory: {self.user_data_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup user data directory {self.user_data_dir}: {e}")
+
+    def signal_handler(self, signum, frame):
+        """Handle signals for graceful shutdown."""
+        logger.info(f"Received signal {signum}, shutting down gracefully...")
+        try:
+            if self.driver:
+                self.driver.quit()
+            if hasattr(self, 'display') and self.display:
+                self.display.stop()
+            self.cleanup_user_data_dir()
+        except Exception as e:
+            logger.error(f"Error during signal shutdown: {e}")
+        finally:
+            os._exit(0)
 
     def init(self):
         self.display_var_for_debug_recording = os.environ.get("DISPLAY")
@@ -645,6 +707,8 @@ class WebBotAdapter(BotAdapter):
             self.driver.close()
         except Exception as e:
             logger.info(f"Error closing driver: {e}")
+        # Clean up the user data directory
+        self.cleanup_user_data_dir()
 
     def cleanup(self):
         if self.stop_recording_screen_callback:
@@ -678,6 +742,9 @@ class WebBotAdapter(BotAdapter):
                     logger.info(f"Error quitting driver: {e}")
         except Exception as e:
             logger.info(f"Error during cleanup: {e}")
+
+        # Clean up the user data directory
+        self.cleanup_user_data_dir()
 
         if self.debug_screen_recorder:
             self.debug_screen_recorder.stop()
