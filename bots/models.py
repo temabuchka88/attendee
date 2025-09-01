@@ -602,6 +602,9 @@ class Bot(models.Model):
     def k8s_pod_name(self):
         return f"bot-pod-{self.id}-{self.object_id}".lower().replace("_", "-")
 
+    def webpage_streamer_pod_name(self):
+        return self.k8s_pod_name() + "-webpage-streamer"
+
     def automatic_leave_settings(self):
         return self.settings.get("automatic_leave_settings", {})
 

@@ -141,10 +141,7 @@ class BotPodCreator:
                     capabilities=client.V1Capabilities(drop=["ALL"]),
                     seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
                 )                
-            )
-
-        containers = [bot_container] if not add_webpage_streamer else [bot_container, webpage_streamer_container]
-            
+            )        
 
         pod = client.V1Pod(
             metadata=client.V1ObjectMeta(
@@ -154,7 +151,7 @@ class BotPodCreator:
                 annotations=annotations
             ),
             spec=client.V1PodSpec(
-                containers=containers,
+                containers=[bot_container],
                 restart_policy="Never",
                 image_pull_secrets=[
                     client.V1LocalObjectReference(
@@ -181,11 +178,54 @@ class BotPodCreator:
             )
         )
 
+        if add_webpage_streamer:
+            webpage_streamer_pod = client.V1Pod(
+                metadata=client.V1ObjectMeta(
+                    name=f"{bot_name}-webpage-streamer",
+                    namespace=self.namespace,
+                    labels=labels,
+                    annotations=annotations
+                ),
+                spec=client.V1PodSpec(
+                    containers=[webpage_streamer_container],
+                    restart_policy="Never",
+                    image_pull_secrets=[
+                        client.V1LocalObjectReference(
+                            name="regcred"
+                        )
+                    ],
+                    termination_grace_period_seconds=60,
+                    # Add tolerations to allow pods to be scheduled on nodes with specific taints
+                    # This can help with scheduling during autoscaling events
+                    tolerations=[
+                        client.V1Toleration(
+                            key="node.kubernetes.io/not-ready",
+                            operator="Exists",
+                            effect="NoExecute",
+                            toleration_seconds=900  # Tolerate not-ready nodes for 15 minutes
+                        ),
+                        client.V1Toleration(
+                            key="node.kubernetes.io/unreachable",
+                            operator="Exists",
+                            effect="NoExecute",
+                            toleration_seconds=900  # Tolerate unreachable nodes for 15 minutes
+                        )
+                    ]
+                )
+            )
+
         try:
             api_response = self.v1.create_namespaced_pod(
                 namespace=self.namespace,
                 body=pod
             )
+
+            if add_webpage_streamer:
+                webpage_streamer_api_response = self.v1.create_namespaced_pod(
+                    namespace=self.namespace,
+                    body=webpage_streamer_pod
+                )
+                logger.info(f"Webpage streamer pod created: {webpage_streamer_api_response}")
             
             return {
                 "name": api_response.metadata.name,
