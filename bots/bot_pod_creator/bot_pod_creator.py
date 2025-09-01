@@ -217,6 +217,29 @@ class BotPodCreator:
                 )
             )
 
+            owner_ref = client.V1OwnerReference(
+                api_version="v1",
+                kind="Pod",
+                name=webpage_streamer_pod.metadata.name,
+                uid=webpage_streamer_pod.metadata.uid,
+                controller=False,           # Pod is not a controller
+                block_owner_deletion=False
+            )
+
+            svc = client.V1Service(
+                metadata=client.V1ObjectMeta(
+                    name=f"{webpage_streamer_pod.metadata.name}-service",
+                    namespace=self.namespace,
+                    owner_references=[owner_ref],
+                ),
+                spec=client.V1ServiceSpec(
+                    selector={"app": "webpage-streamer", "bot-id": bot_name},
+                    ports=[client.V1ServicePort(name="http", port=8000, target_port=8000)],
+                    type="ClusterIP",
+                ),
+            )
+            client.CoreV1Api().create_namespaced_service(self.namespace, svc)
+
         try:
             api_response = self.v1.create_namespaced_pod(
                 namespace=self.namespace,
