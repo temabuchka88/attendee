@@ -121,11 +121,8 @@ class BotPodCreator:
                         name="DJANGO_SETTINGS_MODULE",
                         value=os.getenv("DJANGO_SETTINGS_MODULE")
                     ),
-                ],
-                security_context = client.V1SecurityContext(
-                    run_as_user=1000,                 # matches image USER app
-                    run_as_group=1000,                # keep file perms consistent
-                )                
+                    client.V1EnvVar(name="ALSA_CONFIG_PATH", value="/tmp/asoundrc"),
+                ],               
             )
 
         containers = [bot_container] if not add_webpage_streamer else [bot_container, webpage_streamer_container]

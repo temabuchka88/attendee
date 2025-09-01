@@ -37,7 +37,7 @@ class ScreenAndAudioRecorder:
             ffmpeg_cmd = [
                 "ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "verbose", "-y",
                 "-thread_queue_size", "4096",
-                "-f", "alsa", "-i", "default",
+                "-f", "pulse", "-i", "default",
                 "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100", "-ac", "1",
                 self.file_location,
             ]
@@ -51,7 +51,7 @@ class ScreenAndAudioRecorder:
                 "-f", "x11grab", "-draw_mouse", "0", "-probesize", "32",
                 "-i", str(display_var),
                 "-thread_queue_size", "4096",
-                "-f", "alsa", "-i", "default",
+                "-f", "pulse", "-i", "default",
                 "-vf", f"crop={rw}:{rh}:10:10",
                 "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-g", "30",
                 "-c:a", "aac", "-b:a", "128k",
