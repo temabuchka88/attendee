@@ -103,7 +103,7 @@ WORKDIR $cwd
 
 # Copy only what you need; set ownership/perm at copy time
 COPY --chown=app:app --chmod=0755 entrypoint.sh /opt/bin/entrypoint.sh
-COPY --chown=app:app . .   # no need for a later chown -R
+COPY --chown=app:app . .
 
 # Switch to non-root AFTER copies to avoid permission flakiness
 USER app
