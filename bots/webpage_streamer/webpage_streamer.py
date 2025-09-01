@@ -6,12 +6,12 @@ logger = logging.getLogger(__name__)
 
 import asyncio
 import os
+import shutil
+import signal
+import subprocess
 import sys
 import time
 import uuid
-import shutil
-import subprocess
-import signal
 
 import numpy as np
 from aiohttp import web
@@ -141,10 +141,10 @@ class WebpageStreamer:
         except ValueError as e:
             # This happens when not running in the main thread
             logger.info(f"Could not register signal handlers (not in main thread): {e}")
-        
+
         # Clean up any previous Chrome processes and user data directories
         self.cleanup_chrome_processes()
-        
+
         self.display_var_for_recording = os.environ.get("DISPLAY")
         if os.environ.get("DISPLAY") is None:
             # Create virtual display only if no real display is available
@@ -159,7 +159,7 @@ class WebpageStreamer:
         # options.add_argument("--use-fake-ui-for-media-stream")
         options.add_argument(f"--window-size={self.video_frame_size[0]},{self.video_frame_size[1]}")
         options.add_argument("--start-fullscreen")
-        
+
         # Create a unique user data directory and store it for cleanup
         self.user_data_dir = f"/tmp/user-data-dir-{uuid.uuid4()}"
         options.add_argument(f"--user-data-dir={self.user_data_dir}")

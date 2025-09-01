@@ -3,13 +3,13 @@ import datetime
 import json
 import logging
 import os
-import signal
 import shutil
+import signal
 import subprocess
 import threading
 import time
-from time import sleep
 import uuid
+from time import sleep
 
 import numpy as np
 import requests
@@ -438,7 +438,7 @@ class WebBotAdapter(BotAdapter):
         options.add_argument("--use-fake-ui-for-media-stream")
         options.add_argument(f"--window-size={self.video_frame_size[0]},{self.video_frame_size[1]}")
         options.add_argument("--start-fullscreen")
-        
+
         # Create a unique user data directory and store it for cleanup
         self.user_data_dir = f"/tmp/user-data-dir-{uuid.uuid4()}"
         options.add_argument(f"--user-data-dir={self.user_data_dir}")
@@ -538,7 +538,7 @@ class WebBotAdapter(BotAdapter):
         try:
             if self.driver:
                 self.driver.quit()
-            if hasattr(self, 'display') and self.display:
+            if hasattr(self, "display") and self.display:
                 self.display.stop()
             self.cleanup_user_data_dir()
         except Exception as e:
