@@ -1,8 +1,11 @@
 import os
 import uuid
+import logging
 from typing import Dict, Optional
 
 from kubernetes import client, config
+
+logger = logging.getLogger(__name__)
 
 # fmt: off
 
