@@ -98,53 +98,8 @@ class WebpageStreamer:
         self.display = None
         self.last_keepalive_time = None
         self.keepalive_monitor_task = None
-        self.user_data_dir = None
-
-    def cleanup_chrome_processes(self):
-        """Kill any lingering Chrome processes that might be holding onto user data directories."""
-        try:
-            # Kill Chrome processes that might be using our user data directory pattern
-            subprocess.run(["pkill", "-f", "user-data-dir"], check=False, capture_output=True)
-            logger.info("Cleaned up any existing Chrome processes")
-        except Exception as e:
-            logger.warning(f"Failed to cleanup Chrome processes: {e}")
-
-    def cleanup_user_data_dir(self):
-        """Clean up the user data directory if it exists."""
-        if self.user_data_dir and os.path.exists(self.user_data_dir):
-            try:
-                shutil.rmtree(self.user_data_dir, ignore_errors=True)
-                logger.info(f"Cleaned up user data directory: {self.user_data_dir}")
-            except Exception as e:
-                logger.warning(f"Failed to cleanup user data directory {self.user_data_dir}: {e}")
-
-    def signal_handler(self, signum, frame):
-        """Handle signals for graceful shutdown."""
-        logger.info(f"Received signal {signum}, shutting down gracefully...")
-        try:
-            if self.driver:
-                self.driver.quit()
-            if self.display:
-                self.display.stop()
-            self.cleanup_user_data_dir()
-        except Exception as e:
-            logger.error(f"Error during signal shutdown: {e}")
-        finally:
-            sys.exit(0)
 
     def run(self):
-        # Set up signal handlers for graceful shutdown (only works in main thread)
-        try:
-            signal.signal(signal.SIGTERM, self.signal_handler)
-            signal.signal(signal.SIGINT, self.signal_handler)
-            logger.info("Signal handlers registered successfully")
-        except ValueError as e:
-            # This happens when not running in the main thread
-            logger.info(f"Could not register signal handlers (not in main thread): {e}")
-
-        # Clean up any previous Chrome processes and user data directories
-        self.cleanup_chrome_processes()
-
         self.display_var_for_recording = os.environ.get("DISPLAY")
         if os.environ.get("DISPLAY") is None:
             # Create virtual display only if no real display is available
@@ -160,11 +115,6 @@ class WebpageStreamer:
         options.add_argument(f"--window-size={self.video_frame_size[0]},{self.video_frame_size[1]}")
         options.add_argument("--start-fullscreen")
 
-        # Create a unique user data directory and store it for cleanup
-        self.user_data_dir = f"/tmp/user-data-dir-{uuid.uuid4()}"
-        options.add_argument(f"--user-data-dir={self.user_data_dir}")
-        options.add_argument("--no-first-run")
-        options.add_argument("--no-default-browser-check")
         # options.add_argument('--headless=new')
         options.add_argument("--disable-gpu")
         # options.add_argument("--mute-audio")
@@ -174,10 +124,6 @@ class WebpageStreamer:
         options.add_argument("--enable-blink-features=WebCodecs,WebRTC-InsertableStreams,-AutomationControlled")
         options.add_argument("--remote-debugging-port=9222")
         options.add_argument("--no-sandbox")  # Helps with permission issues
-        options.add_argument("--disable-background-timer-throttling")
-        options.add_argument("--disable-backgrounding-occluded-windows")
-        options.add_argument("--disable-renderer-backgrounding")
-        options.add_argument("--force-device-scale-factor=1")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
         options.add_experimental_option(
@@ -187,13 +133,8 @@ class WebpageStreamer:
             },
         )
 
-        try:
-            self.driver = webdriver.Chrome(options=options)
-            logger.info(f"web driver server initialized at port {self.driver.service.port}")
-        except Exception as e:
-            logger.error(f"Failed to initialize Chrome driver: {e}")
-            self.cleanup_user_data_dir()
-            raise
+        self.driver = webdriver.Chrome(options=options)
+        logger.info(f"web driver server initialized at port {self.driver.service.port}")
 
         with open("bots/webpage_streamer/webpage_streamer_payload.js", "r") as file:
             payload_code = file.read()
@@ -230,8 +171,6 @@ class WebpageStreamer:
                 self.driver.quit()
             if self.display:
                 self.display.stop()
-            # Clean up the user data directory
-            self.cleanup_user_data_dir()
             logger.info("Process shutting down due to keepalive timeout")
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
