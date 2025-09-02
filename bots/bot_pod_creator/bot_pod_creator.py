@@ -104,11 +104,11 @@ class BotPodCreator:
                         security_context = client.V1SecurityContext(
                             run_as_non_root=True,
                             run_as_user=1000,                 # matches image USER app
-                            run_as_group=1000,                # keep file perms consistent
+                            run_as_group=1000,                # keep file perms consistent,
+                            allow_privilege_escalation=True,
+                            capabilities=client.V1Capabilities(drop=["ALL"]),
+                            seccomp_profile=client.V1SeccompProfile(type="Unconfined"),
                             #read_only_root_filesystem=True,
-                            #allow_privilege_escalation=False,
-                            #capabilities=client.V1Capabilities(drop=["ALL"]),
-                            #seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
                         ) 
                     )
 
@@ -138,12 +138,12 @@ class BotPodCreator:
                 security_context = client.V1SecurityContext(
                     run_as_non_root=True,
                     run_as_user=1000,                 # matches image USER app
-                    run_as_group=1000,                # keep file perms consistent
-                    #read_only_root_filesystem=True,
-                    allow_privilege_escalation=False,
+                    run_as_group=1000,                # keep file perms consistent,
+                    allow_privilege_escalation=True,
                     capabilities=client.V1Capabilities(drop=["ALL"]),
-                    seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
-                )                
+                    seccomp_profile=client.V1SeccompProfile(type="Unconfined"),
+                    #read_only_root_filesystem=True,
+                )              
             )        
 
         pod = client.V1Pod(
