@@ -70,7 +70,7 @@ RUN apt-get update && apt-get install -y xterm
 # Install python dependencies
 RUN pip install pyjwt cython gdown deepgram-sdk python-dotenv
 
-# Install libavdevice-dev
+# Install libavdevice-dev. Needed so that webpage streaming using pyav will work.
 RUN apt-get update && apt-get install -y libavdevice-dev && pip uninstall -y av && pip install --no-binary av "av==12.0.0"
 
 # Install gstreamer
@@ -93,7 +93,7 @@ WORKDIR /opt
 
 FROM deps AS build
 
-# Create non-root user once
+# Create non-root user
 RUN useradd -m -u 1000 -s /bin/bash app
 
 # Workdir owned by app in one shot during copy
@@ -102,7 +102,7 @@ ENV cwd=/$project
 WORKDIR $cwd
 
 # Copy only what you need; set ownership/perm at copy time
-COPY --chown=app:app --chmod=0755 entrypoint.sh /opt/bin/entrypoint.sh
+COPY --chown=app:app --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY --chown=app:app . .
 
 # Make STATIC_ROOT writeable for the non-root user so collectstatic can run at startup
@@ -112,5 +112,5 @@ RUN mkdir -p "$cwd/staticfiles" && chown -R app:app "$cwd/staticfiles"
 USER app
 
 # Use tini + entrypoint; CMD can be overridden by compose
-ENTRYPOINT ["/tini","--","/opt/bin/entrypoint.sh"]
+ENTRYPOINT ["/tini","--","/usr/local/bin/entrypoint.sh"]
 CMD ["bash"]
