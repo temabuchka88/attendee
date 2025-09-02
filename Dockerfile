@@ -93,8 +93,15 @@ WORKDIR /opt
 
 FROM deps AS build
 
+# Ensure Chrome's setuid sandbox helper is SUID root
+RUN chown root:root /opt/google/chrome/chrome-sandbox \
+ && chmod 4755    /opt/google/chrome/chrome-sandbox
+
 # Create non-root user
 RUN useradd -m -u 1000 -s /bin/bash app
+
+# Make sure these directories exist but don't pre-create files under /
+RUN mkdir -p /home/app /run/user/1000 /tmp
 
 # Workdir owned by app in one shot during copy
 ENV project=attendee
