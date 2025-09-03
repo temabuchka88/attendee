@@ -93,10 +93,6 @@ WORKDIR /opt
 
 FROM deps AS build
 
-# Ensure Chrome's setuid sandbox helper is SUID root
-RUN chown root:root /opt/google/chrome/chrome-sandbox \
- && chmod 4755    /opt/google/chrome/chrome-sandbox
-
 # Create non-root user
 RUN useradd -m -u 1000 -s /bin/bash app
 
