@@ -120,7 +120,6 @@ class WebpageStreamer:
         options.add_argument("--enable-blink-features=WebCodecs,WebRTC-InsertableStreams,-AutomationControlled")
         options.add_argument("--remote-debugging-port=9222")
         #options.add_argument("--no-sandbox")  # Helps with permission issues
-        options.add_argument(f"--user-data-dir={os.getenv('CHROME_USER_DATA_DIR', '/home/app/chrome-data')}")
 
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
 

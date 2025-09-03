@@ -96,9 +96,6 @@ FROM deps AS build
 # Create non-root user
 RUN useradd -m -u 1000 -s /bin/bash app
 
-# Make sure these directories exist but don't pre-create files under /
-RUN mkdir -p /home/app /run/user/1000 /tmp
-
 # Workdir owned by app in one shot during copy
 ENV project=attendee
 ENV cwd=/$project

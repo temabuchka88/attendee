@@ -11,7 +11,7 @@ services:
       - DJANGO_SETTINGS_MODULE=attendee.settings.development
     command: "celery -A attendee worker -l INFO"
     security_opt:
-      - seccomp=./chrome.json        # tighten syscalls (Linux only)
+      - seccomp=./chrome_seccomp.json        # tighten syscalls (Linux only)
 
   attendee-scheduler-local:
     build: ./
@@ -51,7 +51,7 @@ services:
       - DJANGO_SETTINGS_MODULE=attendee.settings.development
     command: "python bots/webpage_streamer/run_webpage_streamer.py"
     security_opt:
-      - seccomp=./chrome.json        # tighten syscalls (Linux only)
+      - seccomp=./chrome_seccomp.json        # tighten syscalls (Linux only)
 
 
   postgres:
