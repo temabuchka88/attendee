@@ -51,6 +51,13 @@ class BotPodCreator:
         if bot_cpu_request is None:
             bot_cpu_request = os.getenv("BOT_CPU_REQUEST", "4")
 
+        # It's annoying but if we want chrome sandboxing, we need to use Unconfined seccomp profile 
+        # because chrome with sandboxing needs some syscalls that are not allowed by the default profile
+        if os.getenv("ENABLE_CHROME_SANDBOX", "false").lower() == "true":
+            seccomp_profile = client.V1SeccompProfile(type="Unconfined")
+        else:
+            seccomp_profile = client.V1SeccompProfile(type="RuntimeDefault")
+
         # Set the command based on bot_id
         # Run entrypoint script first, then the bot command
         command = ["python", "manage.py", "run_bot", "--botid", str(bot_id)]
@@ -107,7 +114,7 @@ class BotPodCreator:
                             run_as_group=1000,                # keep file perms consistent,
                             allow_privilege_escalation=False,
                             capabilities=client.V1Capabilities(drop=["ALL"]),
-                            seccomp_profile=client.V1SeccompProfile(type="Unconfined"),
+                            seccomp_profile=seccomp_profile,
                             #read_only_root_filesystem=True,
                         ) 
                     )
@@ -141,7 +148,7 @@ class BotPodCreator:
                     run_as_group=1000,                # keep file perms consistent,
                     allow_privilege_escalation=False,
                     capabilities=client.V1Capabilities(drop=["ALL"]),
-                    seccomp_profile=client.V1SeccompProfile(type="Unconfined"),
+                    seccomp_profile=seccomp_profile,
                     #read_only_root_filesystem=True,
                 )              
             )        
