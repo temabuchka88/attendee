@@ -326,6 +326,7 @@ class WebpageStreamer:
             "probesize": "32",
             "analyzeduration": "0",
             "thread_queue_size": "64",
+            "draw_mouse": "0",
         }
         video_player = MediaPlayer(video_device, format=video_format, options=v_opts)
 
