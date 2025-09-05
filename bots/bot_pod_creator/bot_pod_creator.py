@@ -162,6 +162,7 @@ class BotPodCreator:
             ),
             spec=client.V1PodSpec(
                 containers=[bot_container],
+                service_account_name=os.getenv("BOT_POD_SERVICE_ACCOUNT_NAME", "default"),
                 restart_policy="Never",
                 image_pull_secrets=[
                     client.V1LocalObjectReference(
@@ -205,6 +206,7 @@ class BotPodCreator:
                 ),
                 spec=client.V1PodSpec(
                     containers=[webpage_streamer_container],
+                    service_account_name=os.getenv("WEBPAGE_STREAMER_POD_SERVICE_ACCOUNT_NAME", "default"),
                     restart_policy="Never",
                     image_pull_secrets=[
                         client.V1LocalObjectReference(
