@@ -421,17 +421,21 @@ class WebBotAdapter(BotAdapter):
         options.add_argument("--use-fake-device-for-media-stream")
         options.add_argument("--use-fake-ui-for-media-stream")
         options.add_argument(f"--window-size={self.video_frame_size[0]},{self.video_frame_size[1]}")
-        options.add_argument("--no-sandbox")
         options.add_argument("--start-fullscreen")
-
         # options.add_argument('--headless=new')
         options.add_argument("--disable-gpu")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-application-cache")
-        options.add_argument("--disable-setuid-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
+
+        if os.getenv("ENABLE_CHROME_SANDBOX", "false").lower() != "true":
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-setuid-sandbox")
+            logger.info("Chrome sandboxing is disabled")
+        else:
+            logger.info("Chrome sandboxing is enabled")
 
         prefs = {
             "credentials_enable_service": False,

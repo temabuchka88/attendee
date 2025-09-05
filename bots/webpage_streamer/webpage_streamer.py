@@ -115,11 +115,17 @@ class WebpageStreamer:
         options.add_argument("--disable-gpu")
         # options.add_argument("--mute-audio")
         options.add_argument("--disable-application-cache")
-        options.add_argument("--disable-setuid-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--enable-blink-features=WebCodecs,WebRTC-InsertableStreams,-AutomationControlled")
         options.add_argument("--remote-debugging-port=9222")
-        options.add_argument("--no-sandbox")  # Helps with permission issues
+
+        if os.getenv("ENABLE_CHROME_SANDBOX", "false").lower() != "true":
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-setuid-sandbox")
+            logger.info("Chrome sandboxing is disabled")
+        else:
+            logger.info("Chrome sandboxing is enabled")
+
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
         options.add_experimental_option(
@@ -231,7 +237,7 @@ class WebpageStreamer:
                 try:
                     params = v_sender.getParameters()
                     # Keep one encoding, cap bitrate to avoid queue build-up
-                    params.encodings = [{"maxBitrate": 1_500_000, "maxFramerate": 15}]
+                    #params.encodings = [{"maxBitrate": 1_500_000, "maxFramerate": 15}]
                     v_sender.setParameters(params)
                 except Exception:
                     pass
@@ -243,7 +249,7 @@ class WebpageStreamer:
                 try:
                     params = a_sender.getParameters()
                     # Keep one encoding, cap bitrate to avoid queue build-up
-                    params.encodings = [{"maxBitrate": 64_000, "maxFramerate": 15}]
+                    #params.encodings = [{"maxBitrate": 64_000, "maxFramerate": 15}]
                     a_sender.setParameters(params)
                 except Exception:
                     pass

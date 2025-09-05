@@ -51,6 +51,13 @@ class BotPodCreator:
         if bot_cpu_request is None:
             bot_cpu_request = os.getenv("BOT_CPU_REQUEST", "4")
 
+        # It's annoying but if we want chrome sandboxing, we need to use Unconfined seccomp profile 
+        # because chrome with sandboxing needs some syscalls that are not allowed by the default profile
+        if os.getenv("ENABLE_CHROME_SANDBOX", "false").lower() == "true":
+            seccomp_profile = client.V1SeccompProfile(type="Unconfined")
+        else:
+            seccomp_profile = client.V1SeccompProfile(type="RuntimeDefault")
+
         # Set the command based on bot_id
         # Run entrypoint script first, then the bot command
         command = ["python", "manage.py", "run_bot", "--botid", str(bot_id)]
@@ -104,11 +111,11 @@ class BotPodCreator:
                         security_context = client.V1SecurityContext(
                             run_as_non_root=True,
                             run_as_user=1000,                 # matches image USER app
-                            run_as_group=1000,                # keep file perms consistent
+                            run_as_group=1000,                # keep file perms consistent,
+                            allow_privilege_escalation=False,
+                            capabilities=client.V1Capabilities(drop=["ALL"]),
+                            seccomp_profile=seccomp_profile,
                             #read_only_root_filesystem=True,
-                            #allow_privilege_escalation=False,
-                            #capabilities=client.V1Capabilities(drop=["ALL"]),
-                            #seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
                         ) 
                     )
 
@@ -138,12 +145,12 @@ class BotPodCreator:
                 security_context = client.V1SecurityContext(
                     run_as_non_root=True,
                     run_as_user=1000,                 # matches image USER app
-                    run_as_group=1000,                # keep file perms consistent
-                    #read_only_root_filesystem=True,
+                    run_as_group=1000,                # keep file perms consistent,
                     allow_privilege_escalation=False,
                     capabilities=client.V1Capabilities(drop=["ALL"]),
-                    seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
-                )                
+                    seccomp_profile=seccomp_profile,
+                    #read_only_root_filesystem=True,
+                )              
             )        
 
         pod = client.V1Pod(
