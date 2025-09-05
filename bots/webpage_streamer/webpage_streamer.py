@@ -237,7 +237,7 @@ class WebpageStreamer:
                 try:
                     params = v_sender.getParameters()
                     # Keep one encoding, cap bitrate to avoid queue build-up
-                    #params.encodings = [{"maxBitrate": 1_500_000, "maxFramerate": 15}]
+                    # params.encodings = [{"maxBitrate": 1_500_000, "maxFramerate": 15}]
                     v_sender.setParameters(params)
                 except Exception:
                     pass
@@ -249,7 +249,7 @@ class WebpageStreamer:
                 try:
                     params = a_sender.getParameters()
                     # Keep one encoding, cap bitrate to avoid queue build-up
-                    #params.encodings = [{"maxBitrate": 64_000, "maxFramerate": 15}]
+                    # params.encodings = [{"maxBitrate": 64_000, "maxFramerate": 15}]
                     a_sender.setParameters(params)
                 except Exception:
                     pass
