@@ -537,7 +537,8 @@ class Bot(models.Model):
         return websocket_audio_settings.get("sample_rate", 16000)
 
     def voice_agent_url(self):
-        return self.settings.get("voice_agent_settings", {}).get("url", None)
+        voice_agent_settings = self.settings.get("voice_agent_settings", {}) or {}
+        return voice_agent_settings.get("url", None)
 
     def should_launch_webpage_streamer(self):
         return bool(self.voice_agent_url())
