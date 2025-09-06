@@ -765,6 +765,14 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
         if url and not (url.lower().startswith("http://") or url.lower().startswith("https://")):
             raise serializers.ValidationError({"url": "URL must start with http:// or https://"})
 
+        if url:
+            meeting_url = self.initial_data.get("meeting_url")
+            meeting_type = meeting_type_from_url(meeting_url)
+            use_zoom_web_adapter = self.initial_data.get("zoom_settings", {}).get("sdk", "native") == "web"
+
+            if meeting_type == MeetingTypes.ZOOM and not use_zoom_web_adapter:
+                raise serializers.ValidationError("Voice agent is not supported for Zoom when using the native SDK. Please set 'zoom_settings.sdk' to 'web' in the bot creation request.")
+
         return value
 
     transcription_settings = TranscriptionSettingsJSONField(
