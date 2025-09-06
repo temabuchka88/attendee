@@ -50,7 +50,15 @@ class BotPodCreator:
                             #read_only_root_filesystem=True,
                         )
     def get_webpage_streamer_container_security_context(self):
-        return self.get_bot_container_security_context()
+        return client.V1SecurityContext(
+                            run_as_non_root=True,
+                            run_as_user=1000,
+                            run_as_group=1000,
+                            allow_privilege_escalation=False,
+                            capabilities=client.V1Capabilities(drop=["ALL"]),
+                            seccomp_profile=client.V1SeccompProfile(type="Unconfined"),
+                            #read_only_root_filesystem=True,
+                        )
 
     def get_webpage_streamer_container(self):
         args = ["python", "bots/webpage_streamer/run_webpage_streamer.py"]

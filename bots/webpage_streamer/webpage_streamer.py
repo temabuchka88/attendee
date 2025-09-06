@@ -119,12 +119,7 @@ class WebpageStreamer:
         options.add_argument("--enable-blink-features=WebCodecs,WebRTC-InsertableStreams,-AutomationControlled")
         options.add_argument("--remote-debugging-port=9222")
 
-        if os.getenv("ENABLE_CHROME_SANDBOX", "false").lower() != "true":
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-setuid-sandbox")
-            logger.info("Chrome sandboxing is disabled")
-        else:
-            logger.info("Chrome sandboxing is enabled")
+        logger.info("Chrome sandboxing is enabled")
 
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
