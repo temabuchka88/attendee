@@ -57,8 +57,41 @@ class BotPodCreator:
                             allow_privilege_escalation=False,
                             capabilities=client.V1Capabilities(drop=["ALL"]),
                             seccomp_profile=client.V1SeccompProfile(type="Unconfined"),
-                            #read_only_root_filesystem=True,
+                            read_only_root_filesystem=True,
                         )
+
+    def get_webpage_streamer_volumes(self):
+        # Writable /tmp (node-backed by default). Align size with your ephemeral-storage limit.
+        tmp_size = os.getenv("WEBPAGE_STREAMER_TMP_SIZE_LIMIT", "512Mi")
+        tmp_medium = os.getenv("WEBPAGE_STREAMER_TMP_MEDIUM", "")  # "" or "Memory" for tmpfs
+        tmp = client.V1Volume(
+            name="tmp",
+            empty_dir=client.V1EmptyDirVolumeSource(
+                medium=tmp_medium if tmp_medium else None,
+                size_limit=tmp_size
+            )
+        )
+
+        # Optional: larger shared memory for Chromium (strongly recommended)
+        shm_size = os.getenv("WEBPAGE_STREAMER_SHM_SIZE_LIMIT", "256Mi")
+        dshm = client.V1Volume(
+            name="dshm",
+            empty_dir=client.V1EmptyDirVolumeSource(
+                medium="Memory",
+                size_limit=shm_size
+            )
+        )
+
+        # Allow writing to /home directory
+        home = client.V1Volume(name="home", empty_dir=client.V1EmptyDirVolumeSource(size_limit="256Mi"))
+        return [tmp, dshm, home]
+
+    def get_webpage_streamer_volume_mounts(self):
+        return [
+            client.V1VolumeMount(name="tmp", mount_path="/tmp"),
+            client.V1VolumeMount(name="dshm", mount_path="/dev/shm"),
+            client.V1VolumeMount(name="home", mount_path="/home/app"),
+        ]
 
     def get_webpage_streamer_container(self):
         args = ["python", "bots/webpage_streamer/run_webpage_streamer.py"]
@@ -85,7 +118,8 @@ class BotPodCreator:
                     ),
                     client.V1EnvVar(name="ALSA_CONFIG_PATH", value="/tmp/asoundrc"),
                 ],
-                security_context = self.get_webpage_streamer_container_security_context()
+                security_context = self.get_webpage_streamer_container_security_context(),
+                volume_mounts=self.get_webpage_streamer_volume_mounts()
             )  
 
     def get_bot_container(self):
@@ -225,7 +259,8 @@ class BotPodCreator:
                         )
                     ],
                     termination_grace_period_seconds=60,
-                    tolerations=self.get_pod_tolerations()
+                    tolerations=self.get_pod_tolerations(),
+                    volumes=self.get_webpage_streamer_volumes(),
                 )
             )
 
