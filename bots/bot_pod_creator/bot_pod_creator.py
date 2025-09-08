@@ -111,13 +111,7 @@ class BotPodCreator:
                         "ephemeral-storage": os.getenv("WEBPAGE_STREAMING_EPHEMERAL_STORAGE_LIMIT", "0.5Gi")
                     }
                 ),
-                env=[
-                    client.V1EnvVar(
-                        name="DJANGO_SETTINGS_MODULE",
-                        value=os.getenv("DJANGO_SETTINGS_MODULE")
-                    ),
-                    client.V1EnvVar(name="ALSA_CONFIG_PATH", value="/tmp/asoundrc"),
-                ],
+                env=[],
                 security_context = self.get_webpage_streamer_container_security_context(),
                 volume_mounts=self.get_webpage_streamer_volume_mounts()
             )  
