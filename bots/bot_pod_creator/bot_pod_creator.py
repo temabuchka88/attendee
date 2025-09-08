@@ -18,6 +18,7 @@ class BotPodCreator:
         
         self.v1 = client.CoreV1Api()
         self.namespace = namespace
+        self.webpage_streamer_namespace = namespace + "webpagestreamer"
         
         # Get configuration from environment variables
         self.app_name = os.getenv('CUBER_APP_NAME', 'attendee')
@@ -194,13 +195,15 @@ class BotPodCreator:
         self.bot_cpu_request = bot_cpu_request
 
         # Metadata labels matching the deployment
-        labels = {
+        bot_pod_labels = {
             "app.kubernetes.io/name": self.app_name,
             "app.kubernetes.io/instance": self.app_instance,
             "app.kubernetes.io/version": self.app_version,
             "app.kubernetes.io/managed-by": "cuber",
-            "app": "bot-proc"
+            "app": "bot-proc",
         }
+        if add_webpage_streamer:
+            bot_pod_labels["network-role"] = "attendeewebpagestreamerreceiver"
 
         annotations = {}
         if os.getenv("USING_KARPENTER", "false").lower() == "true":
@@ -211,7 +214,7 @@ class BotPodCreator:
             metadata=client.V1ObjectMeta(
                 name=bot_name,
                 namespace=self.namespace,
-                labels=labels,
+                labels=bot_pod_labels,
                 annotations=annotations
             ),
             spec=client.V1PodSpec(
@@ -230,16 +233,15 @@ class BotPodCreator:
 
         if add_webpage_streamer:
             # Create specific labels for the webpage streamer pod
-            webpage_streamer_labels = labels.copy()
-            webpage_streamer_labels.update({
+            webpage_streamer_labels = {
                 "app": "webpage-streamer",
                 "bot-id": bot_name
-            })
+            }
             
             webpage_streamer_pod = client.V1Pod(
                 metadata=client.V1ObjectMeta(
                     name=f"{bot_name}-webpage-streamer",
-                    namespace=self.namespace,
+                    namespace=self.webpage_streamer_namespace,
                     labels=webpage_streamer_labels,
                     annotations=annotations
                 ),
@@ -266,7 +268,7 @@ class BotPodCreator:
 
             if add_webpage_streamer:
                 webpage_streamer_pod_api_response = self.v1.create_namespaced_pod(
-                    namespace=self.namespace,
+                    namespace=self.webpage_streamer_namespace,
                     body=webpage_streamer_pod
                 )
                 logger.info(f"Webpage streamer pod created: {webpage_streamer_pod_api_response}")
@@ -284,7 +286,7 @@ class BotPodCreator:
                 webpage_streamer_pod_service = client.V1Service(
                     metadata=client.V1ObjectMeta(
                         name=f"{webpage_streamer_pod_api_response.metadata.name}-service",
-                        namespace=self.namespace,
+                        namespace=self.webpage_streamer_namespace,
                         owner_references=[owner_ref],
                     ),
                     spec=client.V1ServiceSpec(
@@ -294,7 +296,7 @@ class BotPodCreator:
                         type="ClusterIP",
                     ),
                 )
-                self.v1.create_namespaced_service(self.namespace, webpage_streamer_pod_service)
+                self.v1.create_namespaced_service(self.webpage_streamer_namespace, webpage_streamer_pod_service)
 
             return {
                 "name": bot_pod_api_response.metadata.name,
