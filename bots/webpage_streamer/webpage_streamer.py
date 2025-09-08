@@ -126,6 +126,7 @@ class WebpageStreamer:
             "prefs",
             {
                 "profile.default_content_setting_values.media_stream_mic": 1,  # 1 = allow, 2 = block
+                "profile.default_content_setting_values.media_stream_camera": 2,  # 1 = allow, 2 = block
             },
         )
 
