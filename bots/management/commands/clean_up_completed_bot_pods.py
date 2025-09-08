@@ -18,7 +18,7 @@ class Command(BaseCommand):
         except config.ConfigException:
             config.load_kube_config()
         self.v1 = client.CoreV1Api()
-        self.namespaces = ["attendee", "attendeewebpagestreamer"]
+        self.namespaces = ["attendee", "attendee-webpage-streamer"]
         logger.info("initialized kubernetes client")
 
     def handle(self, *args, **options):

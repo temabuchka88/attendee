@@ -626,7 +626,7 @@ class Bot(models.Model):
         return f"bot-pod-{self.id}-{self.object_id}".lower().replace("_", "-")
 
     def k8s_webpage_streamer_service_hostname(self):
-        return self.k8s_pod_name() + "-webpage-streamer-service.attendeewebpagestreamer.svc.cluster.local"
+        return self.k8s_pod_name() + "-webpage-streamer-service.attendee-webpage-streamer.svc.cluster.local"
 
     def automatic_leave_settings(self):
         return self.settings.get("automatic_leave_settings", {})

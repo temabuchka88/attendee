@@ -18,7 +18,7 @@ class BotPodCreator:
         
         self.v1 = client.CoreV1Api()
         self.namespace = namespace
-        self.webpage_streamer_namespace = namespace + "webpagestreamer"
+        self.webpage_streamer_namespace = namespace + "webpage-streamer"
         
         # Get configuration from environment variables
         self.app_name = os.getenv('CUBER_APP_NAME', 'attendee')
@@ -203,7 +203,7 @@ class BotPodCreator:
             "app": "bot-proc",
         }
         if add_webpage_streamer:
-            bot_pod_labels["network-role"] = "attendeewebpagestreamerreceiver"
+            bot_pod_labels["network-role"] = "attendee-webpage-streamerreceiver"
 
         annotations = {}
         if os.getenv("USING_KARPENTER", "false").lower() == "true":
