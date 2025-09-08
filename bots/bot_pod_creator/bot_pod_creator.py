@@ -203,7 +203,7 @@ class BotPodCreator:
             "app": "bot-proc",
         }
         if add_webpage_streamer:
-            bot_pod_labels["network-role"] = "attendee-webpage-streamerreceiver"
+            bot_pod_labels["network-role"] = "attendee-webpage-streamer-receiver"
 
         annotations = {}
         if os.getenv("USING_KARPENTER", "false").lower() == "true":
