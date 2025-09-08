@@ -93,7 +93,6 @@ class WebpageStreamer:
         self.display_var_for_recording = None
         self.display = None
         self.last_keepalive_time = None
-        self.keepalive_monitor_task = None
 
     def run(self):
         self.display_var_for_recording = os.environ.get("DISPLAY")
@@ -146,7 +145,7 @@ class WebpageStreamer:
         self.load_webapp()
 
     async def keepalive_monitor(self):
-        """Monitor keepalive status and shutdown if no keepalive received in the last minute."""
+        """Monitor keepalive status and shutdown if no keepalive received in the last 15 minutes."""
 
         self.last_keepalive_time = time.time()
 
@@ -156,7 +155,7 @@ class WebpageStreamer:
             current_time = time.time()
             time_since_last_keepalive = current_time - self.last_keepalive_time
 
-            if time_since_last_keepalive > 180:  # More than 3 minutes since last keepalive
+            if time_since_last_keepalive > 900:  # More than 15 minutes since last keepalive
                 logger.warning(f"No keepalive received in {time_since_last_keepalive:.1f} seconds. Shutting down process.")
                 await self.shutdown_process()
                 break
@@ -282,17 +281,12 @@ class WebpageStreamer:
             print(f"Starting streaming to {webpage_url}")
             self.driver.get(webpage_url)
 
-            # Start keepalive monitoring
-            if self.keepalive_monitor_task is None or self.keepalive_monitor_task.done():
-                self.keepalive_monitor_task = asyncio.create_task(self.keepalive_monitor())
-                logger.info("Started keepalive monitoring task")
-
             return web.json_response({"status": "success"})
 
         async def keepalive(req):
             """Keepalive endpoint to reset the timeout timer."""
             self.last_keepalive_time = time.time()
-            logger.debug("Keepalive received")
+            logger.info("Keepalive received")
             return web.json_response({"status": "alive", "timestamp": self.last_keepalive_time})
 
         async def shutdown(req):
@@ -335,6 +329,15 @@ class WebpageStreamer:
         audio_player = MediaPlayer(audio_device, format=audio_format, options=a_opts)
 
         app = web.Application()
+
+        # Start keepalive monitoring task
+        async def init_keepalive_monitor(app):
+            """Initialize keepalive monitoring when the app starts"""
+            logger.info("Starting keepalive monitoring task")
+            asyncio.create_task(self.keepalive_monitor())
+            logger.info("Started keepalive monitoring task")
+
+        app.on_startup.append(init_keepalive_monitor)
 
         # Add CORS handling for preflight requests
         async def handle_cors_preflight(request):
