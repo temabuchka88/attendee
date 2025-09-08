@@ -18,7 +18,7 @@ class BotPodCreator:
         
         self.v1 = client.CoreV1Api()
         self.namespace = namespace
-        self.webpage_streamer_namespace = namespace + "webpage-streamer"
+        self.webpage_streamer_namespace = namespace + "-webpage-streamer"
         
         # Get configuration from environment variables
         self.app_name = os.getenv('CUBER_APP_NAME', 'attendee')
