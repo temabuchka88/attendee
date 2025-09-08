@@ -697,8 +697,8 @@ class WebBotAdapter(BotAdapter):
             except Exception as e:
                 logger.info(f"Error shutting down websocket server: {e}")
 
-        # If we were sending the keepalive to the streaming service, send a shutdown request
-        if self.webpage_streamer_keepalive_task:
+        # If we launched a webpage streamer, send a shutdown request
+        if self.voice_agent_url:
             self.send_webpage_streamer_shutdown_request()
 
         self.cleaned_up = True
