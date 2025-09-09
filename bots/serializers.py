@@ -46,7 +46,7 @@ def get_openai_model_enum():
     return default_models
 
 
-from .meeting_url_utils import meeting_type_from_url
+from .meeting_url_utils import get_normalized_teams_url, meeting_type_from_url
 from .utils import is_valid_png, transcription_provider_from_bot_creation_data
 
 # Define the schema once
@@ -74,6 +74,10 @@ class BotValidationMixin:
         if meeting_type == MeetingTypes.GOOGLE_MEET:
             if not value.startswith("https://meet.google.com/"):
                 raise serializers.ValidationError("Google Meet URL must start with https://meet.google.com/")
+
+        # Teams URLS are problematic and often need to be normalized
+        if meeting_type == MeetingTypes.TEAMS:
+            return get_normalized_teams_url(value)
 
         return value
 
