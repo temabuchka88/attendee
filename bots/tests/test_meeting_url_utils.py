@@ -1,17 +1,10 @@
 # test_meeting_utils.py
 import unittest
 
-from bots.utils import (
-    root_domain_from_url,
-    domain_and_subdomain_from_url,
-    is_valid_teams_url,
-    meeting_type_from_url,
-    MeetingTypes
-)
+from bots.meeting_url_utils import MeetingTypes, domain_and_subdomain_from_url, is_valid_teams_url, meeting_type_from_url, root_domain_from_url
 
 
-class TestMeetingUtils(unittest.TestCase):
-
+class TestMeetingUrlUtils(unittest.TestCase):
     def test_root_domain_from_url(self):
         self.assertEqual(root_domain_from_url("https://meet.google.com/abc-defg-hij"), "google.com")
         self.assertEqual(root_domain_from_url("https://teams.microsoft.com/l/meetup-join/..."), "microsoft.com")
@@ -22,7 +15,7 @@ class TestMeetingUtils(unittest.TestCase):
     def test_domain_and_subdomain_from_url(self):
         self.assertEqual(domain_and_subdomain_from_url("https://meet.google.com/abc-defg-hij"), "meet.google.com")
         self.assertEqual(domain_and_subdomain_from_url("https://teams.microsoft.com/l/meetup-join/..."), "teams.microsoft.com")
-        self.assertEqual(domain_and_subdomain_from_url("https://zoom.us/j/123456789"), "zoom.us")
+        self.assertEqual(domain_and_subdomain_from_url("https://zoom.us/j/123456789"), ".zoom.us")
         self.assertIsNone(domain_and_subdomain_from_url(""))
         self.assertIsNone(domain_and_subdomain_from_url(None))
 

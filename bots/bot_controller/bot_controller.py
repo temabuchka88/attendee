@@ -18,6 +18,7 @@ from bots.bot_adapter import BotAdapter
 from bots.bot_controller.bot_websocket_client import BotWebsocketClient
 from bots.bots_api_utils import BotCreationSource
 from bots.external_callback_utils import get_zoom_tokens
+from bots.meeting_url_utils import meeting_type_from_url
 from bots.models import (
     Bot,
     BotChatMessageRequestManager,
@@ -45,7 +46,6 @@ from bots.models import (
     Utterance,
     WebhookTriggerTypes,
 )
-from bots.utils import meeting_type_from_url
 from bots.webhook_payloads import chat_message_webhook_payload, participant_event_webhook_payload, utterance_webhook_payload
 from bots.webhook_utils import trigger_webhook
 from bots.websocket_payloads import mixed_audio_websocket_payload

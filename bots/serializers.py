@@ -46,7 +46,8 @@ def get_openai_model_enum():
     return default_models
 
 
-from .utils import is_valid_png, meeting_type_from_url, transcription_provider_from_bot_creation_data
+from .meeting_url_utils import meeting_type_from_url
+from .utils import is_valid_png, transcription_provider_from_bot_creation_data
 
 # Define the schema once
 BOT_IMAGE_SCHEMA = {
