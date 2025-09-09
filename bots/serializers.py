@@ -2,6 +2,9 @@ import base64
 import json
 import os
 from dataclasses import asdict
+import logging
+
+logger = logging.getLogger(__name__)
 
 import jsonschema
 from django.utils import timezone
@@ -77,7 +80,10 @@ class BotValidationMixin:
 
         # Teams URLS are problematic and often need to be normalized
         if meeting_type == MeetingTypes.TEAMS:
-            return get_normalized_teams_url(value)
+            normalized_teams_url = get_normalized_teams_url(value)
+            if normalized_teams_url != value:
+                logger.info(f"Normalized Teams URL: {normalized_teams_url} from {value}")
+            return normalized_teams_url
 
         return value
 
