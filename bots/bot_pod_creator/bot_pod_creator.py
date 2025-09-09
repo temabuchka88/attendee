@@ -63,7 +63,7 @@ class BotPodCreator:
 
     def get_webpage_streamer_volumes(self):
         # Writable /tmp (node-backed by default). Align size with your ephemeral-storage limit.
-        tmp_size = os.getenv("WEBPAGE_STREAMER_TMP_SIZE_LIMIT", "512Mi")
+        tmp_size = os.getenv("WEBPAGE_STREAMER_TMP_SIZE_LIMIT", "1024Mi")
         tmp_medium = os.getenv("WEBPAGE_STREAMER_TMP_MEDIUM", "")  # "" or "Memory" for tmpfs
         tmp = client.V1Volume(
             name="tmp",
@@ -74,7 +74,7 @@ class BotPodCreator:
         )
 
         # Optional: larger shared memory for Chromium (strongly recommended)
-        shm_size = os.getenv("WEBPAGE_STREAMER_SHM_SIZE_LIMIT", "256Mi")
+        shm_size = os.getenv("WEBPAGE_STREAMER_SHM_SIZE_LIMIT", "1024Mi")
         dshm = client.V1Volume(
             name="dshm",
             empty_dir=client.V1EmptyDirVolumeSource(
@@ -84,7 +84,7 @@ class BotPodCreator:
         )
 
         # Allow writing to /home directory
-        home = client.V1Volume(name="home", empty_dir=client.V1EmptyDirVolumeSource(size_limit="256Mi"))
+        home = client.V1Volume(name="home", empty_dir=client.V1EmptyDirVolumeSource(size_limit="1024Mi"))
         return [tmp, dshm, home]
 
     def get_webpage_streamer_volume_mounts(self):
