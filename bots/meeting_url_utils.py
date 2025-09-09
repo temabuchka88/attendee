@@ -1,17 +1,17 @@
-import re
-import logging
+from urllib.parse import unquote
 
 from tldextract import tldextract
-from urllib.parse import unquote
 
 from .models import (
     MeetingTypes,
 )
 
+
 def root_domain_from_url(url):
     if not url:
         return None
     return tldextract.extract(url).registered_domain
+
 
 def domain_and_subdomain_from_url(url):
     if not url:
@@ -19,11 +19,13 @@ def domain_and_subdomain_from_url(url):
     extract_from_url = tldextract.extract(url)
     return extract_from_url.subdomain + "." + extract_from_url.registered_domain
 
+
 def get_normalized_teams_url(url):
     if url is None:
         return None
- 
+
     return unquote(unquote(url.strip())).rstrip(">")
+
 
 def meeting_type_from_url(url):
     if not url:
