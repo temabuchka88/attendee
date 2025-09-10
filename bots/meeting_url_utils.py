@@ -1,7 +1,7 @@
 import base64
 import json
 import re
-from urllib.parse import unquote
+from urllib.parse import parse_qs, unquote, urlparse, urlunparse
 
 import tldextract
 
@@ -91,7 +91,20 @@ def normalize_meeting_url_raw(url):
     domain_and_subdomain = domain_and_subdomain_from_url(url)
 
     if root_domain == "zoom.us":
-        return MeetingTypes.ZOOM, url
+        # Parse the URL and keep only the 'pwd' query parameter
+        parsed_url = urlparse(url)
+        query_params = parse_qs(parsed_url.query)
+
+        # Keep only the 'pwd' parameter if it exists
+        filtered_params = {}
+        if "pwd" in query_params:
+            filtered_params["pwd"] = query_params["pwd"]
+
+        # Reconstruct the URL with only the pwd parameter
+        new_query = "&".join([f"{key}={value[0]}" for key, value in filtered_params.items()])
+        normalized_url = urlunparse(("https", parsed_url.netloc, parsed_url.path, "", new_query, ""))
+
+        return MeetingTypes.ZOOM, normalized_url
 
     # Check if it's a Google Meet URL
     if domain_and_subdomain == "meet.google.com":
