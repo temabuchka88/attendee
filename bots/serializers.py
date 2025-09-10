@@ -49,7 +49,7 @@ def get_openai_model_enum():
     return default_models
 
 
-from .meeting_url_utils import get_normalized_teams_url, meeting_type_from_url
+from .meeting_url_utils import meeting_type_from_url, normalize_meeting_url
 from .utils import is_valid_png, transcription_provider_from_bot_creation_data
 
 # Define the schema once
@@ -70,22 +70,14 @@ class BotValidationMixin:
     """Mixin class providing meeting URL validation for serializers."""
 
     def validate_meeting_url(self, value):
-        meeting_type = meeting_type_from_url(value)
+        meeting_type, normalized_url = normalize_meeting_url(value)
         if meeting_type is None:
+            logger.error(f"Invalid meeting URL: {value}")
             raise serializers.ValidationError("Invalid meeting URL")
 
-        if meeting_type == MeetingTypes.GOOGLE_MEET:
-            if not value.startswith("https://meet.google.com/"):
-                raise serializers.ValidationError("Google Meet URL must start with https://meet.google.com/")
-
-        # Teams URLS are problematic and often need to be normalized
-        if meeting_type == MeetingTypes.TEAMS:
-            normalized_teams_url = get_normalized_teams_url(value)
-            if normalized_teams_url != value:
-                logger.info(f"Normalized Teams URL: {normalized_teams_url} from {value}")
-            return normalized_teams_url
-
-        return value
+        if normalized_url != value:
+            logger.info(f"Normalized Meeting URL: {normalized_url} from {value}")
+        return normalized_url
 
     def validate_join_at(self, value):
         """Validate that join_at cannot be in the past."""

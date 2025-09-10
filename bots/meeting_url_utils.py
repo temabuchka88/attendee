@@ -1,4 +1,5 @@
 import base64
+import json
 import re
 from urllib.parse import unquote
 
@@ -56,27 +57,138 @@ def domain_and_subdomain_from_url(url):
     return extract_from_url.subdomain + "." + extract_from_url.registered_domain
 
 
-def get_normalized_teams_url(url):
-    if url is None:
-        return None
-
-    return unquote(unquote(url.strip())).rstrip(">")
-
-
 def meeting_type_from_url(url):
+    meeting_type, normalized_url = normalize_meeting_url(url)
+    return meeting_type
+
+
+def normalize_teams_url(conversation_id, message_id, tenant_id, organizer_id):
+    return f'https://teams.microsoft.com/l/meetup-join/{conversation_id}/{message_id}?context={{"Tid":"{tenant_id}","Oid":"{organizer_id}"}}'
+
+
+def normalize_meeting_url(url):
     if not url:
-        return None
-    if contains_multiple_urls(url):
-        return None
+        return None, None
+
+    url = url.strip().rstrip(">")
+
+    for _ in range(3):
+        meeting_type, normalized_url = normalize_meeting_url_raw(url)
+        if meeting_type is not None and normalized_url is not None and not contains_multiple_urls(normalized_url):
+            return meeting_type, normalized_url
+
+        url = unquote(url)
+
+    return None, None
+
+
+def normalize_meeting_url_raw(url):
+    # Returns (meeting_type, normalized_url)
+    if not url:
+        return None, None
 
     root_domain = root_domain_from_url(url)
     domain_and_subdomain = domain_and_subdomain_from_url(url)
 
     if root_domain == "zoom.us":
-        return MeetingTypes.ZOOM
-    elif domain_and_subdomain == "meet.google.com":
-        return MeetingTypes.GOOGLE_MEET
-    elif domain_and_subdomain == "teams.microsoft.com" or domain_and_subdomain == "teams.live.com":
-        return MeetingTypes.TEAMS
-    else:
-        return None
+        return MeetingTypes.ZOOM, url
+
+    # Check if it's a Google Meet URL
+    if domain_and_subdomain == "meet.google.com":
+        # Use regex to extract the meeting code from Google Meet URL
+        # Meeting code is the part after meet.google.com/
+        google_meet_match = re.search(r"meet\.google\.com/([a-zA-Z0-9-]+)", url)
+        if google_meet_match:
+            meeting_code = google_meet_match.group(1)
+            normalized_url = f"https://meet.google.com/{meeting_code}"
+            return MeetingTypes.GOOGLE_MEET, normalized_url
+
+    if domain_and_subdomain == "teams.microsoft.com" or domain_and_subdomain == "teams.live.com":
+        # Teams URL format: https://teams.microsoft.com/l/meetup-join/<conversation_id>/<message_id>?context={"Tid":"<tenant_id>","Oid":"<organizer_id>"}
+        # Robustly handles various Teams URL patterns that may appear before /l/meetup-join/ such as:
+        # - https://teams.microsoft.com/v2/?meetingjoin=true#/l/meetup-join/...
+        # - https://teams.microsoft.com/some/other/path#/l/meetup-join/...
+        # - https://teams.microsoft.com/l/meetup-join/... (direct format)
+        teams_match = re.search(r"teams\.(?:microsoft\.com|live\.com)(?:/[^/]*)*?/l/meetup-join/([^/]+)/([^?]+)\?context=.*?\"Tid\":\"([^\"]+)\".*?\"Oid\":\"([^\"]+)\"", url)
+
+        if teams_match:
+            conversation_id = teams_match.group(1)
+            message_id = teams_match.group(2)
+            tenant_id = teams_match.group(3)
+            organizer_id = teams_match.group(4)
+
+            # Construct normalized URL with extracted components
+            return MeetingTypes.TEAMS, normalize_teams_url(conversation_id, message_id, tenant_id, organizer_id)
+
+        # Handle Teams launcher URLs like:
+        # https://teams.microsoft.com/dl/launcher/launcher.html?url=/_#/l/meetup-join/19:meeting_...@thread.v2/0?context={"Tid":"...","Oid":"..."}&...
+        teams_launcher_match = re.search(r"teams\.microsoft\.com/dl/launcher/launcher\.html\?url=/_#/l/meetup-join/([^/]+)/([^?]+)\?context=.*?\"Tid\":\"([^\"]+)\".*?\"Oid\":\"([^\"]+)\"", url)
+
+        if teams_launcher_match:
+            conversation_id = teams_launcher_match.group(1)
+            message_id = teams_launcher_match.group(2)
+            tenant_id = teams_launcher_match.group(3)
+            organizer_id = teams_launcher_match.group(4)
+
+            # Construct normalized URL with extracted components
+            return MeetingTypes.TEAMS, normalize_teams_url(conversation_id, message_id, tenant_id, organizer_id)
+
+        # Handle Teams light meetings URLs with coordinates:
+        # https://teams.microsoft.com/light-meetings/launch?agent=web&version=...&coords=<base64_encoded_json>&...
+        teams_light_meetings_match = re.search(r"teams\.microsoft\.com/light-meetings/launch\?.*coords=([^&]+)", url)
+
+        if teams_light_meetings_match:
+            try:
+                # Extract and decode the coords parameter
+                coords_param = teams_light_meetings_match.group(1)
+                # URL decode first if needed
+                coords_param = unquote(coords_param)
+                # Base64 decode
+                decoded_coords = base64.b64decode(coords_param).decode("utf-8")
+                # Parse JSON
+                coords_data = json.loads(decoded_coords)
+
+                # Extract required fields from the JSON
+                conversation_id = coords_data.get("conversationId")
+                tenant_id = coords_data.get("tenantId")
+                organizer_id = coords_data.get("organizerId")
+                message_id = coords_data.get("messageId", "0")  # Default to '0' if not present
+
+                if conversation_id and tenant_id and organizer_id:
+                    # Construct normalized URL with extracted components
+                    return MeetingTypes.TEAMS, normalize_teams_url(conversation_id, message_id, tenant_id, organizer_id)
+
+            except (ValueError, KeyError, json.JSONDecodeError):
+                # If decoding or parsing fails, continue to next pattern
+                pass
+
+        # Handle Teams URLs with format: https://teams.<domain>.com/meet/<meeting_id>?p=<passcode>
+        teams_live_meetings_match = re.search(r"teams\.([^.]+\.com)(?:/[^/]*)*?/meet/([^?]+)\?p=([^&\s]+)", url)
+
+        if teams_live_meetings_match:
+            domain = teams_live_meetings_match.group(1)  # e.g., "live.com" or "microsoft.com"
+            meeting_id = teams_live_meetings_match.group(2)
+            passcode = teams_live_meetings_match.group(3)
+
+            if domain == "live.com" or domain == "microsoft.com":
+                # Create canonical URL format - using the extracted components
+                # We'll use a consistent format regardless of the original domain
+                canonical_url = f"https://teams.{domain}/meet/{meeting_id}?p={passcode}"
+                return MeetingTypes.TEAMS, canonical_url
+
+        # Handle Teams launcher URLs with format:
+        # https://teams.live.com/dl/launcher/launcher.html?url=/_#/meet/<meeting_id>?p=<passcode>&anon=true&type=meet&...
+        # https://teams.microsoft.com/dl/launcher/launcher.html?url=/_#/meet/<meeting_id>?p=<passcode>&anon=true&type=meet&...
+        teams_launcher_meetings_match = re.search(r"teams\.([^.]+\.com)/dl/launcher/launcher\.html\?url=/_#/meet/([^?]+)\?p=([^&\s]+)", url)
+
+        if teams_launcher_meetings_match:
+            domain = teams_launcher_meetings_match.group(1)  # e.g., "live.com" or "microsoft.com"
+            meeting_id = teams_launcher_meetings_match.group(2)
+            passcode = teams_launcher_meetings_match.group(3)
+
+            if domain == "live.com" or domain == "microsoft.com":
+                # Create canonical URL format using the extracted domain
+                canonical_url = f"https://teams.{domain}/meet/{meeting_id}?p={passcode}"
+                return MeetingTypes.TEAMS, canonical_url
+
+    return None, None
