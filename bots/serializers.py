@@ -575,7 +575,7 @@ class CallbackSettingsJSONField(serializers.JSONField):
         "properties": {
             "url": {
                 "type": "string",
-                "description": "URL of a website containing a voice agent that gets the user's responses from the microphone. The bot will load this website and stream its video and audio to the meeting. The audio from the meeting will be sent to website via the microphone.",
+                "description": "URL of a website containing a voice agent that gets the user's responses from the microphone. The bot will load this website and stream its video and audio to the meeting. The audio from the meeting will be sent to website via the microphone. See https://docs.attendee.dev/guides/voice-agents for further details.",
             },
         },
         "required": ["url"],
