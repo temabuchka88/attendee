@@ -755,6 +755,9 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
         if value is None:
             return value
 
+        if os.getenv("ENABLE_VOICE_AGENTS", "false").lower() != "true":
+            raise serializers.ValidationError("Voice agents are not enabled. Please set the ENABLE_VOICE_AGENTS environment variable to true to use voice agents.")
+
         try:
             jsonschema.validate(instance=value, schema=self.VOICE_AGENT_SETTINGS_SCHEMA)
         except jsonschema.exceptions.ValidationError as e:
@@ -762,8 +765,8 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
 
         # Validate that url is a proper URL
         url = value.get("url")
-        if url and not (url.lower().startswith("http://") or url.lower().startswith("https://")):
-            raise serializers.ValidationError({"url": "URL must start with http:// or https://"})
+        if url and not url.lower().startswith("https://"):
+            raise serializers.ValidationError({"url": "URL must start with https://"})
 
         if url:
             meeting_url = self.initial_data.get("meeting_url")

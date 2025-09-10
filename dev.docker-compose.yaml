@@ -54,6 +54,8 @@ services:
     command: "python bots/webpage_streamer/run_webpage_streamer.py"
     security_opt:
       - seccomp=./bots/web_bot_adapter/chrome_seccomp.json
+    profiles:
+      - webpage-streamer
 
 
   postgres:
