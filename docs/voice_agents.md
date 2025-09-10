@@ -49,7 +49,7 @@ In order to bring your voice agent into a meeting, Attendee will launch a contai
 
 4. Pass any references to objects in your system (IE agent_id) via query parameters in the webpage URL.
 
-For an example of a simple website that loads a VAPI voice agent, see [this example](https://attendee.dev/vapi_voice_agent_example).
+For an example of a simple website that loads a VAPI voice agent, view the source of [this example page](https://attendee.dev/vapi_voice_agent_example).
 
 ## Quick start
 
