@@ -95,14 +95,32 @@ def normalize_meeting_url_raw(url):
         parsed_url = urlparse(url)
         query_params = parse_qs(parsed_url.query)
 
-        # Keep only the 'pwd' parameter if it exists
+        # Sanitize the path - extract valid path up to first invalid character
+        sanitized_path = parsed_url.path
+        valid_path_match = re.match(r"^([a-zA-Z0-9/_-]*)", sanitized_path)
+        if valid_path_match:
+            sanitized_path = valid_path_match.group(1)
+
+        # Ensure path starts with / and normalize multiple slashes
+        if not sanitized_path.startswith("/"):
+            sanitized_path = "/" + sanitized_path
+        sanitized_path = re.sub(r"/+", "/", sanitized_path)
+        # Keep only the 'pwd' parameter if it exists and sanitize it
         filtered_params = {}
         if "pwd" in query_params:
-            filtered_params["pwd"] = query_params["pwd"]
+            # Zoom passwords follow pattern: alphanumeric characters, optionally followed by .digits
+            pwd_value = query_params["pwd"][0]  # Get first value from list
+            zoom_pwd_pattern = r"^([a-zA-Z0-9]+(?:\.\d+)?)"
+            match = re.match(zoom_pwd_pattern, pwd_value)
+            if match:
+                # Extract only the valid password part, ignoring any trailing text
+                sanitized_pwd = match.group(1)
+                filtered_params["pwd"] = [sanitized_pwd]
+            # If password doesn't match expected pattern, skip it for security
 
-        # Reconstruct the URL with only the pwd parameter
+        # Reconstruct the URL with sanitized path and only the pwd parameter
         new_query = "&".join([f"{key}={value[0]}" for key, value in filtered_params.items()])
-        normalized_url = urlunparse(("https", parsed_url.netloc, parsed_url.path, "", new_query, ""))
+        normalized_url = urlunparse(("https", parsed_url.netloc, sanitized_path, "", new_query, ""))
 
         return MeetingTypes.ZOOM, normalized_url
 
