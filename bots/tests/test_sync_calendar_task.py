@@ -48,9 +48,9 @@ class TestExtractMeetingUrlFromText(TestCase):
 
     def test_extract_teams_url(self):
         """Test extracting Microsoft Teams URL from text."""
-        text = "Join <https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzctOWVlMzA3NGUyOTRh@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D>"
+        text = "Join <https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzcfffffffffffffffff@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D>"
         result = extract_meeting_url_from_text(text)
-        self.assertEqual(result, "https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzctOWVlMzA3NGUyOTRh@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D")
+        self.assertEqual(result, "https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzcfffffffffffffffff@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D")
 
     def test_no_meeting_url_found(self):
         """Test when no meeting URL is found in text."""
@@ -76,9 +76,9 @@ class TestExtractMeetingUrlFromText(TestCase):
 
     def test_html_href_attribute(self):
         # URL appears inside an HTML attribute
-        text = '<a href="https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzctOWVlMzA3NGUyOTRh@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D#frag">Join</a>'
+        text = '<a href="https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzcfffffffffffffffff@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D#frag">Join</a>'
         result = extract_meeting_url_from_text(text)
-        self.assertEqual(result, "https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzctOWVlMzA3NGUyOTRh@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D#frag")
+        self.assertEqual(result, "https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzcfffffffffffffffff@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D#frag")
 
     def test_url_with_query_and_fragment(self):
         text = "Join: https://meet.google.com/xyz-abcd-efg?hs=122&pli=1#anchor"
@@ -102,9 +102,9 @@ class TestExtractMeetingUrlFromText(TestCase):
         self.assertEqual(result, "https://meet.google.com/xyz-abcd-efg")
 
     def test_ignores_non_meeting_urls_until_valid_found(self):
-        text = "See https://example.com/page then https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzctOWVlMzA3NGUyOTRh@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D"
+        text = "See https://example.com/page then https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzcfffffffffffffffff@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D"
         result = extract_meeting_url_from_text(text)
-        self.assertEqual(result, "https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzctOWVlMzA3NGUyOTRh@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D")
+        self.assertEqual(result, "https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzcfffffffffffffffff@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D")
 
     # --- desirable behavior (enable after you add URL normalization/stripping) ---
 
@@ -119,9 +119,9 @@ class TestExtractMeetingUrlFromText(TestCase):
         self.assertEqual(result, "https://zoom.us/j/123456789")
 
     def test_markdown_link(self):
-        text = "Click [Join](https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzctOWVlMzA3NGUyOTRh@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D)"
+        text = "Click [Join](https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzcfffffffffffffffff@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D)"
         result = extract_meeting_url_from_text(text)
-        self.assertEqual(result, "https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzctOWVlMzA3NGUyOTRh@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D")
+        self.assertEqual(result, "https://teams.microsoft.com/l/meetup-join/19:meeting_YWVhM2VmN2MtOGJhZC00bjdvLTksNzcfffffffffffffffff@thread.v2/0?context=%7B%22Tid%22%3A%2247e45b5d-93ff-45b2-9d36-0e8a2643a5f5%22%2C%22Oid%22%3A%22e3beb726-5124-e6a3-8ee4-ed1e2e43ef68%22%7D")
 
 
 class TestSyncBotWithCalendarEvent(TestCase):

@@ -67,10 +67,10 @@ class TestCreateBot(TestCase):
         self.assertEqual(bot.use_zoom_web_adapter(), True)
 
     def test_create_teams_bot_with_bracket_in_the_url(self):
-        teams_url_with_trailing_carat = "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MjYzNWQ3MzQtNzAzNi00ZTcxLWJjMzctODQwYTBmMDQ4MzQ2%40thread.v2/0?context=%7b%22Tid%22%3a%22b8291b4b-f793-49bc-8a00-9d5fc37b9a77%22%2c%22Oid%22%3a%22216d2e11-45cc-4326-9689-d05554e5c1d1%22%7d>"
+        teams_url_with_trailing_carat = "https://teams.microsoft.com/l/meetup-join/19%3ameeting_ttttttttttttttttttttttcqqqqqqqqqqqqqqqqqqqqqqqqq%40thread.v2/0?context=%7b%22Tid%22%3a%22b8291b4b-f793-49bc-1111-111111111111%22%2c%22Oid%22%3a%22216d2e11-ffff-ffff-1111-ffffffffffff%22%7d>"
         bot, error = create_bot(data={"meeting_url": teams_url_with_trailing_carat, "bot_name": "Test Bot"}, source=BotCreationSource.API, project=self.project)
         self.assertIsNotNone(bot)
-        teams_url_normalized = 'https://teams.microsoft.com/l/meetup-join/19:meeting_MjYzNWQ3MzQtNzAzNi00ZTcxLWJjMzctODQwYTBmMDQ4MzQ2@thread.v2/0?context={"Tid":"b8291b4b-f793-49bc-8a00-9d5fc37b9a77","Oid":"216d2e11-45cc-4326-9689-d05554e5c1d1"}'
+        teams_url_normalized = 'https://teams.microsoft.com/l/meetup-join/19:meeting_ttttttttttttttttttttttcqqqqqqqqqqqqqqqqqqqqqqqqq@thread.v2/0?context={"Tid":"b8291b4b-f793-49bc-1111-111111111111","Oid":"216d2e11-ffff-ffff-1111-ffffffffffff"}'
         self.assertEqual(bot.meeting_url, teams_url_normalized)
         self.assertIsNone(error)
 
