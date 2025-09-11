@@ -54,7 +54,7 @@ class TestMeetingUrlUtils(unittest.TestCase):
         self.assertEqual(meeting_type_from_url("https://meet.google.com/abc-defg-hij"), MeetingTypes.GOOGLE_MEET)
         self.assertEqual(meeting_type_from_url("https://teams.microsoft.com/l/meetup-join/19%3ameeting_ABCDEFGHIJKLMNOPQRSTUVWXYZ@thread.v2/0"), None)
         self.assertEqual(meeting_type_from_url("https://teams.live.com/l/meetup-join/19%3ameeting_1234567890ABCDEFGHIJK@thread.v2/0?context=xyz"), None)
-        self.assertEqual(meeting_type_from_url("https://teams.live.com/meet/9341295272229?p=OVs7TU8cN91WowQYnd"), MeetingTypes.TEAMS)
+        self.assertEqual(meeting_type_from_url("https://teams.live.com/meet/1234567890?p=fffffffffff"), MeetingTypes.TEAMS)
         self.assertEqual(meeting_type_from_url("https://teams.live.com/meet/9876543210?p=abc"), MeetingTypes.TEAMS)
         self.assertIsNone(meeting_type_from_url("https://example.com"))
         self.assertIsNone(meeting_type_from_url(""))
