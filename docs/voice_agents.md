@@ -8,6 +8,8 @@ Attendee supports bringing **voice agents that run in a webpage** directly into 
 
 This makes it easy to integrate AI agents that work with both audio and video.
 
+::scalar-embed{ src="https://www.youtube.com/watch?v=U2j3oCYv488" caption="Voice Agents in Attendee"}
+
 ## Advantages of loading a webpage containing a voice agent
 
 While Attendee also supports voice agents via passing audio packets over [websockets](https://docs.attendee.dev/guides/realtime-audio-input-and-output), loading a webpage offers several advantages:
@@ -73,3 +75,5 @@ curl -X POST https://app.attendee.dev/api/v1/bots \
 ```
 
 4. The agent will be loaded once the bot joins the meeting and starts recording. It will ask you to book an appointment at a healthcare provider.
+
+For a similar example using Tavus to render a photorealistic avatar, see [here](https://attendee.dev/tavus_voice_agent_example).
