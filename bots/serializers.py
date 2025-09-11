@@ -7,6 +7,7 @@ from dataclasses import asdict
 logger = logging.getLogger(__name__)
 
 import jsonschema
+from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from drf_spectacular.utils import (
     OpenApiExample,
@@ -86,6 +87,9 @@ class BotValidationMixin:
 
         if value < timezone.now():
             raise serializers.ValidationError("join_at cannot be in the past")
+
+        if value > timezone.now() + relativedelta(years=3):
+            raise serializers.ValidationError("join_at cannot be more than 3 years in the future")
 
         return value
 
@@ -363,6 +367,21 @@ class TeamsSettingsJSONField(serializers.JSONField):
                 "description": "The Zoom SDK to use for the bot. Use 'web' when you need closed caption based transcription.",
                 "default": "native",
             },
+            "meeting_settings": {
+                "type": "object",
+                "properties": {
+                    "allow_participants_to_unmute_self": {"type": "boolean"},
+                    "allow_participants_to_share_whiteboard": {"type": "boolean"},
+                    "allow_participants_to_request_cloud_recording": {"type": "boolean"},
+                    "allow_participants_to_request_local_recording": {"type": "boolean"},
+                    "allow_participants_to_share_screen": {"type": "boolean"},
+                    "allow_participants_to_chat": {"type": "boolean"},
+                    "enable_focus_mode": {"type": "boolean"},
+                },
+                "required": [],
+                "additionalProperties": False,
+                "description": "Settings for various aspects of the Zoom Meeting. To use these settings, the bot must have host privileges.",
+            },
         },
         "required": [],
         "additionalProperties": False,
@@ -557,6 +576,23 @@ class CallbackSettingsJSONField(serializers.JSONField):
     {
         "type": "object",
         "properties": {
+            "url": {
+                "type": "string",
+                "description": "URL of a website containing a voice agent that gets the user's responses from the microphone. The bot will load this website and stream its video and audio to the meeting. The audio from the meeting will be sent to website via the microphone. See https://docs.attendee.dev/guides/voice-agents for further details.",
+            },
+        },
+        "required": ["url"],
+        "additionalProperties": False,
+    }
+)
+class VoiceAgentSettingsJSONField(serializers.JSONField):
+    pass
+
+
+@extend_schema_field(
+    {
+        "type": "object",
+        "properties": {
             "bucket_name": {
                 "type": "string",
                 "description": "The name of the external storage bucket to use for media files.",
@@ -609,6 +645,12 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
 
     external_media_storage_settings = ExternalMediaStorageSettingsJSONField(
         help_text="Settings that allow Attendee to upload the recording to an external storage bucket controlled by you. This relieves you from needing to download the recording from Attendee and then upload it to your own storage. To use this feature you must add credentials to your project that provide access to the external storage.",
+        required=False,
+        default=None,
+    )
+
+    voice_agent_settings = VoiceAgentSettingsJSONField(
+        help_text="Settings for the voice agent that the bot should load.",
         required=False,
         default=None,
     )
@@ -698,6 +740,44 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
             jsonschema.validate(instance=value, schema=self.EXTERNAL_MEDIA_STORAGE_SETTINGS_SCHEMA)
         except jsonschema.exceptions.ValidationError as e:
             raise serializers.ValidationError(e.message)
+
+        return value
+
+    VOICE_AGENT_SETTINGS_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+            },
+        },
+        "required": ["url"],
+        "additionalProperties": False,
+    }
+
+    def validate_voice_agent_settings(self, value):
+        if value is None:
+            return value
+
+        if os.getenv("ENABLE_VOICE_AGENTS", "false").lower() != "true":
+            raise serializers.ValidationError("Voice agents are not enabled. Please set the ENABLE_VOICE_AGENTS environment variable to true to use voice agents.")
+
+        try:
+            jsonschema.validate(instance=value, schema=self.VOICE_AGENT_SETTINGS_SCHEMA)
+        except jsonschema.exceptions.ValidationError as e:
+            raise serializers.ValidationError(e.message)
+
+        # Validate that url is a proper URL
+        url = value.get("url")
+        if url and not url.lower().startswith("https://"):
+            raise serializers.ValidationError({"url": "URL must start with https://"})
+
+        if url:
+            meeting_url = self.initial_data.get("meeting_url")
+            meeting_type = meeting_type_from_url(meeting_url)
+            use_zoom_web_adapter = self.initial_data.get("zoom_settings", {}).get("sdk", "native") == "web"
+
+            if meeting_type == MeetingTypes.ZOOM and not use_zoom_web_adapter:
+                raise serializers.ValidationError("Voice agent is not supported for Zoom when using the native SDK. Please set 'zoom_settings.sdk' to 'web' in the bot creation request.")
 
         return value
 
@@ -1198,6 +1278,20 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
         "type": "object",
         "properties": {
             "sdk": {"type": "string", "enum": ["web", "native"]},
+            "meeting_settings": {
+                "type": "object",
+                "properties": {
+                    "allow_participants_to_unmute_self": {"type": "boolean"},
+                    "allow_participants_to_share_whiteboard": {"type": "boolean"},
+                    "allow_participants_to_request_cloud_recording": {"type": "boolean"},
+                    "allow_participants_to_request_local_recording": {"type": "boolean"},
+                    "allow_participants_to_share_screen": {"type": "boolean"},
+                    "allow_participants_to_chat": {"type": "boolean"},
+                    "enable_focus_mode": {"type": "boolean"},
+                },
+                "required": [],
+                "additionalProperties": False,
+            },
         },
         "required": [],
         "additionalProperties": False,
@@ -1330,6 +1424,7 @@ class BotSerializer(serializers.ModelSerializer):
     transcription_state = serializers.SerializerMethodField()
     recording_state = serializers.SerializerMethodField()
     join_at = serializers.DateTimeField()
+    deduplication_key = serializers.CharField()
 
     @extend_schema_field(
         {
@@ -1406,6 +1501,7 @@ class BotSerializer(serializers.ModelSerializer):
             "transcription_state",
             "recording_state",
             "join_at",
+            "deduplication_key",
         ]
         read_only_fields = fields
 

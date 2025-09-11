@@ -93,6 +93,8 @@ class BotController:
             send_message_callback=self.on_message_from_adapter,
             add_audio_chunk_callback=add_audio_chunk_callback,
             meeting_url=self.bot_in_db.meeting_url,
+            voice_agent_url=self.bot_in_db.voice_agent_url(),
+            webpage_streamer_service_hostname=self.bot_in_db.k8s_webpage_streamer_service_hostname(),
             add_video_frame_callback=None,
             wants_any_video_frames_callback=None,
             add_mixed_audio_chunk_callback=self.add_mixed_audio_chunk_callback if self.pipeline_configuration.websocket_stream_audio else None,
@@ -123,6 +125,8 @@ class BotController:
             send_message_callback=self.on_message_from_adapter,
             add_audio_chunk_callback=add_audio_chunk_callback,
             meeting_url=self.bot_in_db.meeting_url,
+            voice_agent_url=self.bot_in_db.voice_agent_url(),
+            webpage_streamer_service_hostname=self.bot_in_db.k8s_webpage_streamer_service_hostname(),
             add_video_frame_callback=None,
             wants_any_video_frames_callback=None,
             add_mixed_audio_chunk_callback=self.add_mixed_audio_chunk_callback if self.pipeline_configuration.websocket_stream_audio else None,
@@ -161,6 +165,8 @@ class BotController:
             send_message_callback=self.on_message_from_adapter,
             add_audio_chunk_callback=None,
             meeting_url=self.bot_in_db.meeting_url,
+            voice_agent_url=self.bot_in_db.voice_agent_url(),
+            webpage_streamer_service_hostname=self.bot_in_db.k8s_webpage_streamer_service_hostname(),
             add_video_frame_callback=None,
             wants_any_video_frames_callback=None,
             add_mixed_audio_chunk_callback=self.add_mixed_audio_chunk_callback if self.pipeline_configuration.websocket_stream_audio else None,
@@ -209,6 +215,7 @@ class BotController:
             automatic_leave_configuration=self.automatic_leave_configuration,
             video_frame_size=self.bot_in_db.recording_dimensions(),
             zoom_tokens=zoom_tokens,
+            zoom_meeting_settings=self.bot_in_db.zoom_meeting_settings(),
         )
 
     def add_mixed_audio_chunk_callback(self, chunk: bytes):
@@ -879,8 +886,18 @@ class BotController:
                 logger.info(f"Resuming recording for bot {self.bot_in_db.object_id}")
                 self.bot_in_db.refresh_from_db()
                 self.resume_recording()
+            elif command == "admit_from_waiting_room":
+                logger.info(f"Admitting from waiting room for bot {self.bot_in_db.object_id}")
+                self.bot_in_db.refresh_from_db()
+                self.admit_from_waiting_room()
             else:
                 logger.info(f"Unknown command: {command}")
+
+    def admit_from_waiting_room(self):
+        if not BotEventManager.is_state_that_can_admit_from_waiting_room(self.bot_in_db.state):
+            logger.info(f"Bot {self.bot_in_db.object_id} is in state {BotStates.state_to_api_code(self.bot_in_db.state)} and cannot admit from waiting room")
+            return
+        self.adapter.admit_from_waiting_room()
 
     def pause_recording(self):
         if not BotEventManager.is_state_that_can_pause_recording(self.bot_in_db.state):
