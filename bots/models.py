@@ -387,7 +387,7 @@ class Bot(models.Model):
         return math.ceil(centicredits_active)
 
     def cpu_request(self):
-        from bots.utils import meeting_type_from_url
+        from bots.meeting_url_utils import meeting_type_from_url
 
         bot_meeting_type = meeting_type_from_url(self.meeting_url)
         meeting_type_env_var_substring = {
@@ -585,7 +585,7 @@ class Bot(models.Model):
         return str(save_resource_snapshots_env_var_value).lower() == "true"
 
     def create_debug_recording(self):
-        from bots.utils import meeting_type_from_url
+        from bots.meeting_url_utils import meeting_type_from_url
 
         # Temporarily enabling this for all google meet meetings
         bot_meeting_type = meeting_type_from_url(self.meeting_url)

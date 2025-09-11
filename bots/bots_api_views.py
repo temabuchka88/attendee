@@ -20,6 +20,7 @@ from rest_framework.views import APIView
 from .authentication import ApiKeyAuthentication
 from .bots_api_utils import BotCreationSource, create_bot, create_bot_chat_message_request, create_bot_media_request_for_image, delete_bot, patch_bot, send_sync_command
 from .launch_bot_utils import launch_bot
+from .meeting_url_utils import meeting_type_from_url
 from .models import (
     Bot,
     BotEventManager,
@@ -50,7 +51,6 @@ from .serializers import (
     TranscriptUtteranceSerializer,
 )
 from .throttling import ProjectPostThrottle
-from .utils import meeting_type_from_url
 
 TokenHeaderParameter = [
     OpenApiParameter(

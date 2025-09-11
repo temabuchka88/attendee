@@ -3,8 +3,8 @@ import io
 import cv2
 import numpy as np
 from pydub import AudioSegment
-from tldextract import tldextract
 
+from .meeting_url_utils import meeting_type_from_url
 from .models import (
     MeetingTypes,
     TranscriptionProviders,
@@ -408,36 +408,6 @@ def generate_utterance_json_for_bot_detail_view(recording):
         utterances_data.append(utterance_data)
 
     return utterances_data
-
-
-def root_domain_from_url(url):
-    if not url:
-        return None
-    return tldextract.extract(url).registered_domain
-
-
-def domain_and_subdomain_from_url(url):
-    if not url:
-        return None
-    extract_from_url = tldextract.extract(url)
-    return extract_from_url.subdomain + "." + extract_from_url.registered_domain
-
-
-def meeting_type_from_url(url):
-    if not url:
-        return None
-
-    root_domain = root_domain_from_url(url)
-    domain_and_subdomain = domain_and_subdomain_from_url(url)
-
-    if root_domain == "zoom.us":
-        return MeetingTypes.ZOOM
-    elif domain_and_subdomain == "meet.google.com":
-        return MeetingTypes.GOOGLE_MEET
-    elif domain_and_subdomain == "teams.microsoft.com" or domain_and_subdomain == "teams.live.com":
-        return MeetingTypes.TEAMS
-    else:
-        return None
 
 
 def transcription_provider_from_bot_creation_data(data):
