@@ -197,6 +197,7 @@ class ZoomBotAdapter(BotAdapter):
 
         # webcam is muted initially
         self.webcam_is_muted = True
+        self.current_image_to_send = None
 
     def request_permission_to_record_if_joined_user_is_host(self, joined_user_id):
         # No need to request permission if we already have it
@@ -991,6 +992,8 @@ class ZoomBotAdapter(BotAdapter):
         if self.suggested_video_cap is None:
             logger.info("No suggested video cap. Not sending video.")
             return
+
+        self.current_image_to_send = None
 
         self.mp4_demuxer = MP4Demuxer(
             url=video_url,
