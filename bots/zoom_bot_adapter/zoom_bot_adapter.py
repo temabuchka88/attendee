@@ -586,18 +586,30 @@ class ZoomBotAdapter(BotAdapter):
         self.video_sender = video_sender
         self.suggested_video_cap = suggest_cap
 
+    def unmute_webcam(self):
+        if not self.webcam_is_muted:
+            logger.info("webcam is already unmuted")
+            return True
+
+        if not self.meeting_video_controller:
+            logger.info("meeting_video_controller is None so cannot unmute webcam")
+            return False
+
+        unmute_webcam_result = self.meeting_video_controller.UnmuteVideo()
+        if unmute_webcam_result != zoom.SDKERR_SUCCESS:
+            logger.info(f"Failed to unmute webcam. unmute_webcam_result = {unmute_webcam_result}")
+            return False
+        logger.info("Unmuted webcam")
+        self.webcam_is_muted = False
+        return True
+
     def send_raw_image(self, png_image_bytes):
         if not self.meeting_video_controller:
             logger.info("meeting_video_controller is None so cannot send raw image")
             return
 
-        if self.webcam_is_muted:
-            unmute_video_result = self.meeting_video_controller.UnmuteVideo()
-            if unmute_video_result != zoom.SDKERR_SUCCESS:
-                logger.info(f"Failed to unmute video. unmute_video_result = {unmute_video_result}")
-                return
-            logger.info("Unmuted video")
-            self.webcam_is_muted = False
+        if not self.unmute_webcam():
+            return
 
         yuv420_image_bytes, original_width, original_height = png_to_yuv420_frame(png_image_bytes)
         # We have to scale the image to the zoom video capability width and height for it to display properly
@@ -969,6 +981,9 @@ class ZoomBotAdapter(BotAdapter):
 
     def send_video(self, video_url):
         logger.info(f"send_video called with video_url = {video_url}")
+        if not self.unmute_webcam():
+            return
+
         if self.mp4_demuxer:
             self.mp4_demuxer.stop()
             self.mp4_demuxer = None
