@@ -1357,7 +1357,7 @@ class ElevenLabsProviderTest(TransactionTestCase):
         with self._patch_creds():
             # Mock successful response from ElevenLabs API
             mock_response = mock.Mock(status_code=200)
-            mock_response.json.return_value = {"text": "hello world", "language_probability": 0.9, "words": [{"text": "hello", "start": 0.0, "end": 0.5}, {"text": "world", "start": 0.6, "end": 1.0}]}
+            mock_response.json.return_value = {"text": "hello world", "language_code": "eng", "language_probability": 0.9, "words": [{"text": "hello", "start": 0.0, "end": 0.5}, {"text": "world", "start": 0.6, "end": 1.0}]}
             mock_post.return_value = mock_response
 
             transcript, failure = get_transcription_via_elevenlabs(self.utterance)
@@ -1372,6 +1372,7 @@ class ElevenLabsProviderTest(TransactionTestCase):
             self.assertEqual(transcript["words"][1]["word"], "world")
             self.assertEqual(transcript["words"][1]["start"], 0.6)
             self.assertEqual(transcript["words"][1]["end"], 1.0)
+            self.assertEqual(transcript["language"], "eng")
 
             # Verify API call was made correctly
             mock_pcm.assert_called_once_with(b"pcm-bytes", sample_rate=16_000)
