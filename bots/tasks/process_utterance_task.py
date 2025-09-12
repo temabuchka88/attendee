@@ -550,7 +550,7 @@ def get_transcription_via_elevenlabs(utterance):
         words = list(map(lambda word: {"word": word.get("text"), "start": word.get("start"), "end": word.get("end")}, result.get("words", [])))
 
         # Format the response to match our expected schema
-        transcription = {"transcript": transcript_text, "words": words, "language": result.get("language", None)}
+        transcription = {"transcript": transcript_text, "words": words, "language": result.get("language_code", None)}
 
         return transcription, None
 
