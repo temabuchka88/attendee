@@ -615,16 +615,22 @@ class ZoomBotAdapter(BotAdapter):
             return False
 
         if not self.on_virtual_camera_start_send_callback_called:
-            logger.info("on_virtual_camera_start_send_callback_called not called so cannot send raw image, but will retry later")
+            if self.cannot_send_video_error_ticker % 100 == 0:
+                logger.info("on_virtual_camera_start_send_callback_called not called so cannot send raw image, but will retry later")
+            self.cannot_send_video_error_ticker += 1
             return True
 
         if not self.suggested_video_cap:
-            logger.info("suggested_video_cap is None so cannot send raw image, but will retry later")
+            if self.cannot_send_video_error_ticker % 100 == 0:
+                logger.info("suggested_video_cap is None so cannot send raw image, but will retry later")
+            self.cannot_send_video_error_ticker += 1
             return True
 
         send_video_frame_response = self.video_sender.sendVideoFrame(self.current_image_to_send, self.suggested_video_cap.width, self.suggested_video_cap.height, 0, zoom.FrameDataFormat_I420_FULL)
         if send_video_frame_response != zoom.SDKERR_SUCCESS:
-            logger.info(f"send_current_image_to_zoom failed with send_video_frame_response = {send_video_frame_response}")
+            if self.cannot_send_video_error_ticker % 100 == 0:
+                logger.info(f"send_current_image_to_zoom failed with send_video_frame_response = {send_video_frame_response}")
+            self.cannot_send_video_error_ticker += 1
 
         return True
 
