@@ -136,6 +136,16 @@ def create_mock_zoom_sdk():
     # Replace the mock's MeetingServiceEventCallbacks with our custom version
     base_mock.MeetingServiceEventCallbacks = MockMeetingServiceEventCallbacks
 
+    # Create a custom GetRawdataVideoSourceHelper class that actually stores the callback
+    class MockGetRawdataVideoSourceHelper:
+        def __init__(self):
+            pass
+
+        def setExternalVideoSource(self, video_source):
+            return zoom.SDKError.SDKERR_SUCCESS
+
+    base_mock.GetRawdataVideoSourceHelper = MockGetRawdataVideoSourceHelper
+
     # Set up constants
     base_mock.SDKERR_SUCCESS = zoom.SDKError.SDKERR_SUCCESS
     base_mock.AUTHRET_SUCCESS = zoom.AuthResult.AUTHRET_SUCCESS
@@ -168,6 +178,10 @@ def create_mock_zoom_sdk():
     mock_meeting_service.Join.return_value = base_mock.SDKERR_SUCCESS
     mock_meeting_service.GetMeetingStatus.return_value = base_mock.MEETING_STATUS_IDLE
     mock_meeting_service.Leave.return_value = base_mock.SDKERR_SUCCESS
+
+    mock_meeting_video_controller = MagicMock()
+    mock_meeting_video_controller.UnmuteVideo.return_value = base_mock.SDKERR_SUCCESS
+    mock_meeting_service.GetMeetingVideoController.return_value = mock_meeting_video_controller
 
     # Add mock recording controller
     mock_recording_controller = MagicMock()

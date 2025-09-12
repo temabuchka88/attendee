@@ -195,6 +195,10 @@ class ZoomBotAdapter(BotAdapter):
         # Waiting room controller
         self.waiting_room_ctrl = None
 
+        # webcam is muted initially
+        self.webcam_is_muted = True
+        self.current_image_to_send = None
+
     def request_permission_to_record_if_joined_user_is_host(self, joined_user_id):
         # No need to request permission if we already have it
         if self.recording_permission_granted:
@@ -562,8 +566,8 @@ class ZoomBotAdapter(BotAdapter):
             logger.info(f"set_external_video_source_result = {set_external_video_source_result}")
             if set_external_video_source_result == zoom.SDKERR_SUCCESS:
                 self.meeting_video_controller = self.meeting_service.GetMeetingVideoController()
-                unmute_video_result = self.meeting_video_controller.UnmuteVideo()
-                logger.info(f"unmute_video_result = {unmute_video_result}")
+                # At this point, we can show the bot image if there is one
+                self.send_message_callback({"message": self.Messages.READY_TO_SHOW_BOT_IMAGE})
         else:
             logger.info("video_source_helper is None")
 
@@ -578,23 +582,34 @@ class ZoomBotAdapter(BotAdapter):
             logger.info(f"initial_send_video_frame_response = {initial_send_video_frame_response}")
         self.on_virtual_camera_start_send_callback_called = True
 
-        # At this point, we can show the bot image if there is one
-        self.send_message_callback({"message": self.Messages.READY_TO_SHOW_BOT_IMAGE})
-
     def on_virtual_camera_initialize_callback(self, video_sender, support_cap_list, suggest_cap):
         logger.info(f"on_virtual_camera_initialize_callback called with support_cap_list = {list(map(lambda x: f'{x.width}x{x.height}x{x.frame}', support_cap_list))} suggest_cap = {suggest_cap.width}x{suggest_cap.height}x{suggest_cap.frame}")
         self.video_sender = video_sender
         self.suggested_video_cap = suggest_cap
 
+    def unmute_webcam(self):
+        if not self.webcam_is_muted:
+            logger.info("webcam is already unmuted")
+            return True
+
+        if not self.meeting_video_controller:
+            logger.info("meeting_video_controller is None so cannot unmute webcam")
+            return False
+
+        unmute_webcam_result = self.meeting_video_controller.UnmuteVideo()
+        if unmute_webcam_result != zoom.SDKERR_SUCCESS:
+            logger.info(f"Failed to unmute webcam. unmute_webcam_result = {unmute_webcam_result}")
+            return False
+        logger.info("Unmuted webcam")
+        self.webcam_is_muted = False
+        return True
+
     def send_raw_image(self, png_image_bytes):
-        if not self.on_virtual_camera_start_send_callback_called:
-            if self.cannot_send_video_error_ticker % 500 == 0:
-                logger.error("on_virtual_camera_start_send_callback_called not called so cannot send raw image")
-            self.cannot_send_video_error_ticker += 1
+        if not self.meeting_video_controller:
+            logger.info("meeting_video_controller is None so cannot send raw image")
             return
 
-        if not self.suggested_video_cap:
-            logger.error("suggested_video_cap is None so cannot send raw image")
+        if not self.unmute_webcam():
             return
 
         yuv420_image_bytes, original_width, original_height = png_to_yuv420_frame(png_image_bytes)
@@ -608,13 +623,27 @@ class ZoomBotAdapter(BotAdapter):
             self.send_image_timeout_id = GLib.timeout_add(500, self.send_current_image_to_zoom)
 
     def send_current_image_to_zoom(self):
-        if self.requested_leave or self.cleaned_up or (not self.suggested_video_cap) or (not self.current_image_to_send):
+        if self.requested_leave or self.cleaned_up or (not self.current_image_to_send):
             self.send_image_timeout_id = None
             return False
 
+        if not self.on_virtual_camera_start_send_callback_called:
+            if self.cannot_send_video_error_ticker % 100 == 0:
+                logger.info("on_virtual_camera_start_send_callback_called not called so cannot send raw image, but will retry later")
+            self.cannot_send_video_error_ticker += 1
+            return True
+
+        if not self.suggested_video_cap:
+            if self.cannot_send_video_error_ticker % 100 == 0:
+                logger.info("suggested_video_cap is None so cannot send raw image, but will retry later")
+            self.cannot_send_video_error_ticker += 1
+            return True
+
         send_video_frame_response = self.video_sender.sendVideoFrame(self.current_image_to_send, self.suggested_video_cap.width, self.suggested_video_cap.height, 0, zoom.FrameDataFormat_I420_FULL)
         if send_video_frame_response != zoom.SDKERR_SUCCESS:
-            logger.info(f"send_current_image_to_zoom failed with send_video_frame_response = {send_video_frame_response}")
+            if self.cannot_send_video_error_ticker % 100 == 0:
+                logger.info(f"send_current_image_to_zoom failed with send_video_frame_response = {send_video_frame_response}")
+            self.cannot_send_video_error_ticker += 1
 
         return True
 
@@ -953,6 +982,9 @@ class ZoomBotAdapter(BotAdapter):
 
     def send_video(self, video_url):
         logger.info(f"send_video called with video_url = {video_url}")
+        if not self.unmute_webcam():
+            return
+
         if self.mp4_demuxer:
             self.mp4_demuxer.stop()
             self.mp4_demuxer = None
@@ -960,6 +992,8 @@ class ZoomBotAdapter(BotAdapter):
         if self.suggested_video_cap is None:
             logger.info("No suggested video cap. Not sending video.")
             return
+
+        self.current_image_to_send = None
 
         self.mp4_demuxer = MP4Demuxer(
             url=video_url,
