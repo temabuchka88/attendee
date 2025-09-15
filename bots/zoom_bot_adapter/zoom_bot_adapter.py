@@ -314,18 +314,19 @@ class ZoomBotAdapter(BotAdapter):
             performance_data = self.audio_source.getPerformanceData()
             logger.info(f"totalProcessingTimeMicroseconds = {performance_data.totalProcessingTimeMicroseconds}")
             logger.info(f"numCalls = {performance_data.numCalls}")
-            logger.info(f"maxProcessingTimeMicroseconds = {performance_data.maxProcessingTimeMicroseconds}")
-            logger.info(f"minProcessingTimeMicroseconds = {performance_data.minProcessingTimeMicroseconds}")
-            logger.info(f"meanProcessingTimeMicroseconds = {float(performance_data.totalProcessingTimeMicroseconds) / performance_data.numCalls}")
+            if performance_data.numCalls > 0:
+                logger.info(f"maxProcessingTimeMicroseconds = {performance_data.maxProcessingTimeMicroseconds}")
+                logger.info(f"minProcessingTimeMicroseconds = {performance_data.minProcessingTimeMicroseconds}")
+                logger.info(f"meanProcessingTimeMicroseconds = {float(performance_data.totalProcessingTimeMicroseconds) / performance_data.numCalls}")
 
-            # Print processing time distribution
-            bin_size = (performance_data.processingTimeBinMax - performance_data.processingTimeBinMin) / len(performance_data.processingTimeBinCounts)
-            logger.info("\nProcessing time distribution (microseconds):")
-            for bin_idx, count in enumerate(performance_data.processingTimeBinCounts):
-                if count > 0:
-                    bin_start = bin_idx * bin_size
-                    bin_end = (bin_idx + 1) * bin_size
-                    logger.info(f"{bin_start:6.0f} - {bin_end:6.0f} us: {count:5d} calls")
+                # Print processing time distribution
+                bin_size = (performance_data.processingTimeBinMax - performance_data.processingTimeBinMin) / len(performance_data.processingTimeBinCounts)
+                logger.info("\nProcessing time distribution (microseconds):")
+                for bin_idx, count in enumerate(performance_data.processingTimeBinCounts):
+                    if count > 0:
+                        bin_start = bin_idx * bin_size
+                        bin_end = (bin_idx + 1) * bin_size
+                        logger.info(f"{bin_start:6.0f} - {bin_end:6.0f} us: {count:5d} calls")
 
         if self.meeting_service:
             zoom.DestroyMeetingService(self.meeting_service)
