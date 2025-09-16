@@ -1113,12 +1113,6 @@ class PauseRecordingView(APIView):
         try:
             bot = Bot.objects.get(object_id=object_id, project=request.auth.project)
 
-            # This functionality is not supported for zoom yet
-            meeting_type = meeting_type_from_url(bot.meeting_url)
-            if meeting_type == MeetingTypes.ZOOM:
-                # Pausing recording is not supported for zoom
-                return Response({"error": "Pausing the recording is not supported for zoom bots"}, status=status.HTTP_400_BAD_REQUEST)
-
             # Check if bot is in a state that allows pausing the recording
             if not BotEventManager.is_state_that_can_pause_recording(bot.state):
                 return Response(

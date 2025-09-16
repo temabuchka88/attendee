@@ -157,6 +157,7 @@ class ZoomBotAdapter(BotAdapter):
             self.video_input_manager = VideoInputManager(
                 new_frame_callback=self.add_video_frame_callback,
                 wants_any_frames_callback=self.wants_any_video_frames_callback,
+                recording_is_paused_callback=self.get_recording_is_paused,
                 video_frame_size=self.video_frame_size,
             )
         else:
@@ -198,6 +199,16 @@ class ZoomBotAdapter(BotAdapter):
         # webcam is muted initially
         self.webcam_is_muted = True
         self.current_image_to_send = None
+        self.recording_is_paused = False
+
+    def pause_recording(self):
+        self.recording_is_paused = True
+
+    def resume_recording(self):
+        self.recording_is_paused = False
+
+    def get_recording_is_paused(self):
+        return self.recording_is_paused
 
     def request_permission_to_record_if_joined_user_is_host(self, joined_user_id):
         # No need to request permission if we already have it
