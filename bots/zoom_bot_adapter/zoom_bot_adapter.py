@@ -157,6 +157,7 @@ class ZoomBotAdapter(BotAdapter):
             self.video_input_manager = VideoInputManager(
                 new_frame_callback=self.add_video_frame_callback,
                 wants_any_frames_callback=self.wants_any_video_frames_callback,
+                recording_is_paused_callback=self.get_recording_is_paused,
                 video_frame_size=self.video_frame_size,
             )
         else:
@@ -198,6 +199,16 @@ class ZoomBotAdapter(BotAdapter):
         # webcam is muted initially
         self.webcam_is_muted = True
         self.current_image_to_send = None
+        self.recording_is_paused = False
+
+    def pause_recording(self):
+        self.recording_is_paused = True
+
+    def resume_recording(self):
+        self.recording_is_paused = False
+
+    def get_recording_is_paused(self):
+        return self.recording_is_paused
 
     def request_permission_to_record_if_joined_user_is_host(self, joined_user_id):
         # No need to request permission if we already have it
@@ -409,6 +420,10 @@ class ZoomBotAdapter(BotAdapter):
         builder.Clear()
 
     def on_chat_msg_notification_callback(self, chat_msg_info, content):
+        if self.recording_is_paused:
+            logger.info("on_chat_msg_notification_callback called but recording is paused")
+            return
+
         try:
             self.upsert_chat_message_callback(
                 {
@@ -718,11 +733,16 @@ class ZoomBotAdapter(BotAdapter):
         if node_id == self.my_participant_id:
             return
 
+        if self.recording_is_paused:
+            return
+
         current_time = datetime.utcnow()
         self.last_audio_received_at = time.time()
         self.add_audio_chunk_callback(node_id, current_time, data.GetBuffer())
 
     def add_mixed_audio_chunk_convert_to_bytes(self, data):
+        if self.recording_is_paused:
+            return
         self.add_mixed_audio_chunk_callback(chunk=data.GetBuffer())
 
     def start_raw_recording(self):
