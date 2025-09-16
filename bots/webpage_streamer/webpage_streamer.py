@@ -170,7 +170,7 @@ class WebpageStreamer:
             if self.display:
                 self.display.stop()
             if self.web_app:
-                self.web_app.shutdown()
+                await self.web_app.shutdown()
             logger.info("Process shutting down due to keepalive timeout")
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
