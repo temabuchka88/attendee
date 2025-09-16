@@ -124,6 +124,11 @@ def normalize_meeting_url_raw(url):
         new_query = "&".join([f"{key}={value[0]}" for key, value in filtered_params.items()])
         normalized_url = urlunparse(("https", parsed_url.netloc, sanitized_path, "", new_query, ""))
 
+        # There must be an integer meeting ID in the path
+        meeting_id_match = re.search(r"(\d+)", sanitized_path)
+        if not meeting_id_match or not meeting_id_match.group(1):
+            return None, None
+
         return MeetingTypes.ZOOM, normalized_url
 
     # Check if it's a Google Meet URL
