@@ -742,6 +742,9 @@ class ZoomBotAdapter(BotAdapter):
 
     def add_mixed_audio_chunk_convert_to_bytes(self, data):
         if self.recording_is_paused:
+            # Send zeros instead of real audio data if recording is paused
+            zero_buffer = bytes(len(data.GetBuffer()))
+            self.add_mixed_audio_chunk_callback(chunk=zero_buffer)
             return
         self.add_mixed_audio_chunk_callback(chunk=data.GetBuffer())
 
