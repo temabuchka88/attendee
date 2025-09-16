@@ -420,6 +420,10 @@ class ZoomBotAdapter(BotAdapter):
         builder.Clear()
 
     def on_chat_msg_notification_callback(self, chat_msg_info, content):
+        if self.recording_is_paused:
+            logger.info("on_chat_msg_notification_callback called but recording is paused")
+            return
+
         try:
             self.upsert_chat_message_callback(
                 {
@@ -729,11 +733,16 @@ class ZoomBotAdapter(BotAdapter):
         if node_id == self.my_participant_id:
             return
 
+        if self.recording_is_paused:
+            return
+
         current_time = datetime.utcnow()
         self.last_audio_received_at = time.time()
         self.add_audio_chunk_callback(node_id, current_time, data.GetBuffer())
 
     def add_mixed_audio_chunk_convert_to_bytes(self, data):
+        if self.recording_is_paused:
+            return
         self.add_mixed_audio_chunk_callback(chunk=data.GetBuffer())
 
     def start_raw_recording(self):
