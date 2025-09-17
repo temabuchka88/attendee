@@ -109,6 +109,7 @@ class BotController:
             start_recording_screen_callback=self.screen_and_audio_recorder.start_recording if self.screen_and_audio_recorder else None,
             stop_recording_screen_callback=self.screen_and_audio_recorder.stop_recording if self.screen_and_audio_recorder else None,
             video_frame_size=self.bot_in_db.recording_dimensions(),
+            record_chat_messages_when_paused=self.bot_in_db.record_chat_messages_when_paused(),
         )
 
     def get_teams_bot_adapter(self):
@@ -142,6 +143,7 @@ class BotController:
             stop_recording_screen_callback=self.screen_and_audio_recorder.stop_recording if self.screen_and_audio_recorder else None,
             video_frame_size=self.bot_in_db.recording_dimensions(),
             teams_bot_login_credentials=teams_bot_login_credentials.get_credentials() if teams_bot_login_credentials and self.bot_in_db.teams_use_bot_login() else None,
+            record_chat_messages_when_paused=self.bot_in_db.record_chat_messages_when_paused(),
         )
 
     def get_zoom_oauth_credentials(self):
@@ -184,6 +186,7 @@ class BotController:
             zoom_client_secret=zoom_oauth_credentials["client_secret"],
             zoom_closed_captions_language=self.bot_in_db.zoom_closed_captions_language(),
             should_ask_for_recording_permission=self.pipeline_configuration.record_audio or self.pipeline_configuration.rtmp_stream_audio or self.pipeline_configuration.websocket_stream_audio or self.pipeline_configuration.record_video or self.pipeline_configuration.rtmp_stream_video,
+            record_chat_messages_when_paused=self.bot_in_db.record_chat_messages_when_paused(),
         )
 
     def get_zoom_bot_adapter(self):
@@ -216,6 +219,7 @@ class BotController:
             video_frame_size=self.bot_in_db.recording_dimensions(),
             zoom_tokens=zoom_tokens,
             zoom_meeting_settings=self.bot_in_db.zoom_meeting_settings(),
+            record_chat_messages_when_paused=self.bot_in_db.record_chat_messages_when_paused(),
         )
 
     def add_mixed_audio_chunk_callback(self, chunk: bytes):

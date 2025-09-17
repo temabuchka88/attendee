@@ -47,6 +47,7 @@ class WebBotAdapter(BotAdapter):
         video_frame_size: tuple[int, int],
         voice_agent_url: str,
         webpage_streamer_service_hostname: str,
+        record_chat_messages_when_paused: bool,
     ):
         self.display_name = display_name
         self.send_message_callback = send_message_callback
@@ -61,7 +62,7 @@ class WebBotAdapter(BotAdapter):
         self.start_recording_screen_callback = start_recording_screen_callback
         self.stop_recording_screen_callback = stop_recording_screen_callback
         self.recording_view = recording_view
-
+        self.record_chat_messages_when_paused = record_chat_messages_when_paused
         self.meeting_url = meeting_url
 
         self.video_frame_size = video_frame_size
@@ -254,7 +255,7 @@ class WebBotAdapter(BotAdapter):
         self.upsert_caption_callback(json_data["caption"])
 
     def handle_chat_message(self, json_data):
-        if self.recording_paused:
+        if self.recording_paused and not self.record_chat_messages_when_paused:
             return
 
         self.upsert_chat_message_callback(json_data)

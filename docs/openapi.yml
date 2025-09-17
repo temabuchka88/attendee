@@ -2107,11 +2107,17 @@ components:
               enum:
               - 1080p
               - 720p
+            record_chat_messages_when_paused:
+              type: boolean
+              description: Whether to record chat messages even when the recording
+                is paused. Defaults to false.
+              default: false
           required: []
           default:
             format: mp4
             view: speaker_view
             resolution: 1080p
+            record_chat_messages_when_paused: false
           description: The settings for the bot's recording.
         teams_settings:
           type: object
