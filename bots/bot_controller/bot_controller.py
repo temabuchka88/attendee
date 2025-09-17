@@ -941,7 +941,6 @@ class BotController:
         if not resume_recording_for_pipeline_objects_success:
             raise Exception(f"Failed to resume recording for bot {self.bot_in_db.object_id}")
 
-        
     def resume_recording(self):
         if not BotEventManager.is_state_that_can_resume_recording(self.bot_in_db.state):
             logger.info(f"Bot {self.bot_in_db.object_id} is in state {BotStates.state_to_api_code(self.bot_in_db.state)} and cannot resume recording")

@@ -939,11 +939,11 @@ class BotEventTransitionFunctions:
     def get_to_state_for_bot_breakout_room_event(cls, bot: Bot):
         # Get the last event from the bot
         last_bot_event = bot.last_bot_event()
-        if not last_bot_event.event_type in [BotEventTypes.BOT_BEGAN_JOINING_BREAKOUT_ROOM, BotEventTypes.BOT_BEGAN_LEAVING_BREAKOUT_ROOM]:
+        if last_bot_event.event_type not in [BotEventTypes.BOT_BEGAN_JOINING_BREAKOUT_ROOM, BotEventTypes.BOT_BEGAN_LEAVING_BREAKOUT_ROOM]:
             raise Exception(f"In get_to_state_for_bot_breakout_room_event unexpected event type for last bot event: {last_bot_event.event_type}")
-        
+
         last_bot_event_from_state = last_bot_event.old_state
-        if not last_bot_event_from_state in [BotStates.JOINED_NOT_RECORDING, BotStates.JOINED_RECORDING_PERMISSION_DENIED, BotStates.JOINED_RECORDING, BotStates.JOINED_RECORDING_PAUSED]:
+        if last_bot_event_from_state not in [BotStates.JOINED_NOT_RECORDING, BotStates.JOINED_RECORDING_PERMISSION_DENIED, BotStates.JOINED_RECORDING, BotStates.JOINED_RECORDING_PAUSED]:
             raise Exception(f"In get_to_state_for_bot_breakout_room_event unexpected from_state for last bot event: {last_bot_event_from_state}")
         return last_bot_event_from_state
 
