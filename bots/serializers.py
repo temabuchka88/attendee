@@ -316,6 +316,7 @@ class RTMPSettingsJSONField(serializers.JSONField):
                 "default": False,
             },
         },
+        "additionalProperties": False,
         "required": [],
     }
 )
@@ -1206,6 +1207,7 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
             },
             "record_chat_messages_when_paused": {"type": "boolean"},
         },
+        "additionalProperties": False,
         "required": [],
     }
 
