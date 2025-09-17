@@ -23,6 +23,7 @@ class BotAdapter:
         COULD_NOT_CONNECT_TO_MEETING = "Could not connect to meeting"
         JOINING_BREAKOUT_ROOM = "Joining breakout room"
         LEAVING_BREAKOUT_ROOM = "Leaving breakout room"
+        BOT_RECORDING_PERMISSION_DENIED = "Bot recording permission denied"
 
     class LEAVE_REASON:
         AUTO_LEAVE_SILENCE = "AUTO_LEAVE_SILENCE"

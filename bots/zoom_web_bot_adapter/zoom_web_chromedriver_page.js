@@ -304,7 +304,14 @@ function startMeeting(signature) {
                 change: 'granted'
             });
         }
-        
+
+        if (permissionChange.allow === false)
+        {
+            window.ws.sendJson({
+                type: 'RecordingPermissionChange',
+                change: 'denied'
+            });
+        }        
     });
 }
 

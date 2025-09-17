@@ -903,29 +903,53 @@ class BotController:
             return
         self.adapter.admit_from_waiting_room()
 
+    def pause_recording_for_pipeline_objects(self):
+        pause_recording_success = self.screen_and_audio_recorder.pause_recording() if self.screen_and_audio_recorder else True
+        if not pause_recording_success:
+            return False
+        self.adapter.pause_recording()
+        return True
+
+    def pause_recording_for_pipeline_objects_raise_on_failure(self):
+        pause_recording_for_pipeline_objects_success = self.pause_recording_for_pipeline_objects()
+        if not pause_recording_for_pipeline_objects_success:
+            raise Exception(f"Failed to pause recording for bot {self.bot_in_db.object_id}")
+
     def pause_recording(self):
         if not BotEventManager.is_state_that_can_pause_recording(self.bot_in_db.state):
             logger.info(f"Bot {self.bot_in_db.object_id} is in state {BotStates.state_to_api_code(self.bot_in_db.state)} and cannot pause recording")
             return
-        pause_recording_success = self.screen_and_audio_recorder.pause_recording() if self.screen_and_audio_recorder else True
-        if not pause_recording_success:
+        pause_recording_for_pipeline_objects_success = self.pause_recording_for_pipeline_objects()
+        if not pause_recording_for_pipeline_objects_success:
             logger.error(f"Failed to pause recording for bot {self.bot_in_db.object_id}")
             return
-        self.adapter.pause_recording()
         BotEventManager.create_event(
             bot=self.bot_in_db,
             event_type=BotEventTypes.RECORDING_PAUSED,
         )
 
-    def resume_recording(self):
-        if not BotEventManager.is_state_that_can_resume_recording(self.bot_in_db.state):
-            logger.info(f"Bot {self.bot_in_db.object_id} is in state {BotStates.state_to_api_code(self.bot_in_db.state)} and cannot resume recording")
-            return
+    def resume_recording_for_pipeline_objects(self):
         resume_recording_success = self.screen_and_audio_recorder.resume_recording() if self.screen_and_audio_recorder else True
         if not resume_recording_success:
             logger.error(f"Failed to resume recording for bot {self.bot_in_db.object_id}")
             return
         self.adapter.resume_recording()
+        return True
+
+    def resume_recording_for_pipeline_objects_raise_on_failure(self):
+        resume_recording_for_pipeline_objects_success = self.resume_recording_for_pipeline_objects()
+        if not resume_recording_for_pipeline_objects_success:
+            raise Exception(f"Failed to resume recording for bot {self.bot_in_db.object_id}")
+
+        
+    def resume_recording(self):
+        if not BotEventManager.is_state_that_can_resume_recording(self.bot_in_db.state):
+            logger.info(f"Bot {self.bot_in_db.object_id} is in state {BotStates.state_to_api_code(self.bot_in_db.state)} and cannot resume recording")
+            return
+        resume_recording_for_pipeline_objects_success = self.resume_recording_for_pipeline_objects()
+        if not resume_recording_for_pipeline_objects_success:
+            logger.error(f"Failed to resume recording for bot {self.bot_in_db.object_id}")
+            return
         BotEventManager.create_event(
             bot=self.bot_in_db,
             event_type=BotEventTypes.RECORDING_RESUMED,
@@ -1471,9 +1495,27 @@ class BotController:
 
         if message.get("message") == BotAdapter.Messages.BOT_RECORDING_PERMISSION_GRANTED:
             logger.info("Received message that bot recording permission granted")
+
+            # If the bot had an in progress recording and we get permission granted, then it means the recording permission was granted after being formerly revoked.
+            # The internal pipeline needs to resume recording.
+            self.resume_recording_for_pipeline_objects_raise_on_failure()
+
             BotEventManager.create_event(
                 bot=self.bot_in_db,
                 event_type=BotEventTypes.BOT_RECORDING_PERMISSION_GRANTED,
+            )
+            return
+
+        if message.get("message") == BotAdapter.Messages.BOT_RECORDING_PERMISSION_DENIED:
+            logger.info("Received message that bot recording permission denied")
+
+            # If the bot had an in progress recording and we get permission denied, then it means the recording permission was revoked.
+            # The internal pipeline needs to stop recording.
+            self.pause_recording_for_pipeline_objects_raise_on_failure()
+
+            BotEventManager.create_event(
+                bot=self.bot_in_db,
+                event_type=BotEventTypes.BOT_RECORDING_PERMISSION_DENIED,
             )
             return
 
