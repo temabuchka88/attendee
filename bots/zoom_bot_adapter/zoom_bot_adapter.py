@@ -90,6 +90,7 @@ class ZoomBotAdapter(BotAdapter):
         video_frame_size: tuple[int, int],
         zoom_tokens: dict,
         zoom_meeting_settings: dict,
+        record_chat_messages_when_paused: bool,
     ):
         self.use_one_way_audio = use_one_way_audio
         self.use_mixed_audio = use_mixed_audio
@@ -104,6 +105,7 @@ class ZoomBotAdapter(BotAdapter):
         self.add_participant_event_callback = add_participant_event_callback
         self.zoom_tokens = zoom_tokens
         self.zoom_meeting_settings = zoom_meeting_settings
+        self.record_chat_messages_when_paused = record_chat_messages_when_paused
 
         self._jwt_token = generate_jwt(zoom_client_id, zoom_client_secret)
         self.meeting_id, self.meeting_password = parse_join_url(meeting_url)
@@ -420,7 +422,7 @@ class ZoomBotAdapter(BotAdapter):
         builder.Clear()
 
     def on_chat_msg_notification_callback(self, chat_msg_info, content):
-        if self.recording_is_paused:
+        if self.recording_is_paused and not self.record_chat_messages_when_paused:
             logger.info("on_chat_msg_notification_callback called but recording is paused")
             return
 

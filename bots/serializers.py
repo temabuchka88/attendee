@@ -310,6 +310,11 @@ class RTMPSettingsJSONField(serializers.JSONField):
                 "description": "The resolution to use for the recording. The supported resolutions are '1080p' and '720p'. Defaults to '1080p'.",
                 "enum": RecordingResolutions.values,
             },
+            "record_chat_messages_when_paused": {
+                "type": "boolean",
+                "description": "Whether to record chat messages even when the recording is paused. Defaults to false.",
+                "default": False,
+            },
         },
         "required": [],
     }
@@ -1187,7 +1192,7 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
     recording_settings = RecordingSettingsJSONField(
         help_text="The settings for the bot's recording.",
         required=False,
-        default={"format": RecordingFormats.MP4, "view": RecordingViews.SPEAKER_VIEW, "resolution": RecordingResolutions.HD_1080P},
+        default={"format": RecordingFormats.MP4, "view": RecordingViews.SPEAKER_VIEW, "resolution": RecordingResolutions.HD_1080P, "record_chat_messages_when_paused": False},
     )
 
     RECORDING_SETTINGS_SCHEMA = {
@@ -1199,6 +1204,7 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
                 "type": "string",
                 "enum": list(RecordingResolutions.values),
             },
+            "record_chat_messages_when_paused": {"type": "boolean"},
         },
         "required": [],
     }
@@ -1208,7 +1214,7 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
             return value
 
         # Define defaults
-        defaults = {"format": RecordingFormats.MP4, "view": RecordingViews.SPEAKER_VIEW, "resolution": RecordingResolutions.HD_1080P}
+        defaults = {"format": RecordingFormats.MP4, "view": RecordingViews.SPEAKER_VIEW, "resolution": RecordingResolutions.HD_1080P, "record_chat_messages_when_paused": False}
 
         try:
             jsonschema.validate(instance=value, schema=self.RECORDING_SETTINGS_SCHEMA)
