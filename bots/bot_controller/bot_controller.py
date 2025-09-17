@@ -1516,6 +1516,7 @@ class BotController:
             BotEventManager.create_event(
                 bot=self.bot_in_db,
                 event_type=BotEventTypes.BOT_RECORDING_PERMISSION_DENIED,
+                event_sub_type=BotEventSubTypes.BOT_RECORDING_PERMISSION_DENIED_HOST_DENIED_PERMISSION,
             )
             return
 
