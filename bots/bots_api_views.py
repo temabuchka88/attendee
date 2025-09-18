@@ -35,6 +35,7 @@ from .models import (
     MediaBlob,
     MeetingTypes,
     ParticipantEvent,
+    Participant,
     Recording,
     Utterance,
 )
@@ -45,6 +46,7 @@ from .serializers import (
     ChatMessageSerializer,
     CreateBotSerializer,
     ParticipantEventSerializer,
+    ParticipantSerializer,
     PatchBotSerializer,
     RecordingSerializer,
     SpeechSerializer,
@@ -1325,6 +1327,69 @@ class ParticipantEventsView(GenericAPIView):
                 return self.get_paginated_response(serializer.data)
 
             serializer = self.get_serializer(events, many=True)
+            return Response(serializer.data)
+
+        except Bot.DoesNotExist:
+            return Response({"error": "Bot not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class ParticipantCursorPagination(CursorPagination):
+    ordering = "created_at"
+    page_size = 25
+
+
+class ParticipantsView(GenericAPIView):
+    authentication_classes = [ApiKeyAuthentication]
+    pagination_class = ParticipantCursorPagination
+    serializer_class = ParticipantSerializer
+
+    @extend_schema(
+        operation_id="Get Participants",
+        summary="Get participants for a bot",
+        description="Returns the participants for a bot. Results are paginated using cursor pagination.",
+        responses={
+            200: OpenApiResponse(
+                response=ParticipantSerializer(many=True),
+                description="List of participants",
+            ),
+            404: OpenApiResponse(description="Bot not found"),
+        },
+        parameters=[
+            *TokenHeaderParameter,
+            OpenApiParameter(
+                name="object_id",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="Bot ID",
+                examples=[OpenApiExample("Bot ID Example", value="bot_xxxxxxxxxxx")],
+            ),
+            OpenApiParameter(
+                name="cursor",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Cursor for pagination",
+                required=False,
+            ),
+        ],
+        tags=["Bots"],
+    )
+    def get(self, request, object_id):
+        try:
+            # Get the bot and verify it belongs to the project
+            bot = Bot.objects.get(object_id=object_id, project=request.auth.project)
+
+            # Query participants for this bot. Do not show the participant for the bot itself
+            participants_query = Participant.objects.filter(bot=bot, is_the_bot=False)
+
+            # Apply ordering for cursor pagination
+            participants = participants_query.order_by("created_at")
+
+            # Let the pagination class handle the rest
+            page = self.paginate_queryset(participants)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(participants, many=True)
             return Response(serializer.data)
 
         except Bot.DoesNotExist:
