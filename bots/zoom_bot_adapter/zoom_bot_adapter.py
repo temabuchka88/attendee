@@ -558,10 +558,15 @@ class ZoomBotAdapter(BotAdapter):
                 logger.info(f"on_recording_privilege_changed called. can_record = {can_rec}")
                 if can_rec:
                     self.start_raw_recording()
-                else:
-                    self.stop_raw_recording()
+                elif self.recording_permission_granted:
+                    self.handle_recording_permission_denied()
 
-            self.recording_event = zoom.MeetingRecordingCtrlEventCallbacks(onRecordPrivilegeChangedCallback=on_recording_privilege_changed)
+            def on_local_recording_privilege_request_status_changed(status):
+                logger.info(f"on_local_recording_privilege_request_status called. status = {status}")
+                if status == zoom.RequestLocalRecordingStatus.RequestLocalRecording_Denied:
+                    self.handle_recording_permission_denied()
+
+            self.recording_event = zoom.MeetingRecordingCtrlEventCallbacks(onRecordPrivilegeChangedCallback=on_recording_privilege_changed, onLocalRecordingPrivilegeRequestStatusCallback=on_local_recording_privilege_request_status_changed)
             self.recording_ctrl.SetEvent(self.recording_event)
 
             self.start_raw_recording()
@@ -751,8 +756,6 @@ class ZoomBotAdapter(BotAdapter):
         self.add_mixed_audio_chunk_callback(chunk=data.GetBuffer())
 
     def start_raw_recording(self):
-        self.recording_ctrl = self.meeting_service.GetMeetingRecordingController()
-
         can_start_recording_result = self.recording_ctrl.CanStartRawRecording()
         if can_start_recording_result != zoom.SDKERR_SUCCESS:
             self.recording_ctrl.RequestLocalRecordingPrivilege()
@@ -790,6 +793,10 @@ class ZoomBotAdapter(BotAdapter):
         rec_ctrl = self.meeting_service.StopRawRecording()
         if rec_ctrl.StopRawRecording() != zoom.SDKERR_SUCCESS:
             raise Exception("Error with stop raw recording")
+
+    def handle_recording_permission_denied(self):
+        self.send_message_callback({"message": self.Messages.BOT_RECORDING_PERMISSION_DENIED})
+        self.recording_permission_granted = False
 
     def leave(self):
         if self.meeting_service is None:
