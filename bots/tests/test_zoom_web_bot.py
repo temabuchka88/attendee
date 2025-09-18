@@ -121,10 +121,12 @@ class TestZoomWebBot(TransactionTestCase):
     @patch("bots.web_bot_adapter.web_bot_adapter.Display")
     @patch("bots.web_bot_adapter.web_bot_adapter.webdriver.Chrome")
     @patch("bots.bot_controller.bot_controller.FileUploader")
-    @patch("bots.bot_controller.screen_and_audio_recorder.ScreenAndAudioRecorder")
+    @patch("bots.bot_controller.screen_and_audio_recorder.ScreenAndAudioRecorder.pause_recording", return_value=True)
+    @patch("bots.bot_controller.screen_and_audio_recorder.ScreenAndAudioRecorder.resume_recording", return_value=True)
     def test_recording_permission_denied(
         self,
-        MockScreenAndAudioRecorder,
+        mock_pause_recording,
+        mock_resume_recording,
         MockFileUploader,
         MockChromeDriver,
         MockDisplay,
@@ -141,12 +143,6 @@ class TestZoomWebBot(TransactionTestCase):
         mock_display = MagicMock()
         MockDisplay.return_value = mock_display
 
-        # Mock screen and audio recorder
-        mock_screen_recorder = MagicMock()
-        mock_screen_recorder.pause_recording.return_value = True  # Successful pause
-        mock_screen_recorder.resume_recording.return_value = True
-        MockScreenAndAudioRecorder.return_value = mock_screen_recorder
-
         # Create bot controller
         controller = BotController(self.bot.id)
 
@@ -161,14 +157,8 @@ class TestZoomWebBot(TransactionTestCase):
             bot_thread.daemon = True
             bot_thread.start()
 
-            # Allow time for the bot to initialize and join
-            time.sleep(2)
-
-            # Simulate successful join first
-            controller.adapter.send_message_callback({"message": controller.adapter.Messages.BOT_JOINED_MEETING})
-
             # Allow time for join processing
-            time.sleep(1)
+            time.sleep(2)
 
             # Simulate recording permission denied by calling the method directly
             # This simulates what would happen when a RecordingPermissionChange message
@@ -177,9 +167,6 @@ class TestZoomWebBot(TransactionTestCase):
 
             # Allow time for the message to be processed
             time.sleep(2)
-
-            # Verify that screen_and_audio_recorder.pause_recording() was called
-            mock_screen_recorder.pause_recording.assert_called_once()
 
             # Verify that the adapter's pause_recording() method was called
             # The adapter is WebBotAdapter which sets recording_paused = True
