@@ -26,7 +26,7 @@ class TranscriptMessageFinalizationManager {
         const messageConverted = {
             deviceId: message.userId,
             captionId: message.msgId,
-            text: message.text,
+            text: message.text ? message.text.replace(/\x00/g, '') : '',
             isFinal: !!message.done
         };
         
