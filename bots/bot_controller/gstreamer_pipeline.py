@@ -309,6 +309,10 @@ class GstreamerPipeline:
         if self.pause_timer_id is not None:
             return
 
+        # If there is no start time, then the pipeline has not been started yet
+        if not self.start_time_ns:
+            return
+
         logger.info("Pausing GStreamer pipeline - switching to black frames and zero audio")
 
         # Start the pause timer to send black frames and zero audio every 250ms

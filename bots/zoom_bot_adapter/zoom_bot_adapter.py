@@ -818,8 +818,8 @@ class ZoomBotAdapter(BotAdapter):
                 onMixedAudioRawDataReceivedCallback=self.add_mixed_audio_chunk_convert_to_bytes if self.use_mixed_audio else None,
             )
 
-        audio_helper_subscribe_result = self.audio_helper.subscribe(self.audio_source, False)
-        logger.info(f"audio_helper_subscribe_result = {audio_helper_subscribe_result}")
+            audio_helper_subscribe_result = self.audio_helper.subscribe(self.audio_source, False)
+            logger.info(f"audio_helper_subscribe_result = {audio_helper_subscribe_result}")
 
         GLib.timeout_add(100, self.set_up_video_input_manager)
 
