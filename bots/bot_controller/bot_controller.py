@@ -907,6 +907,8 @@ class BotController:
         pause_recording_success = self.screen_and_audio_recorder.pause_recording() if self.screen_and_audio_recorder else True
         if not pause_recording_success:
             return False
+        if self.gstreamer_pipeline:
+            self.gstreamer_pipeline.pause_recording()
         self.adapter.pause_recording()
         return True
 
@@ -933,6 +935,8 @@ class BotController:
         if not resume_recording_success:
             logger.error(f"Failed to resume recording for bot {self.bot_in_db.object_id}")
             return
+        if self.gstreamer_pipeline:
+            self.gstreamer_pipeline.resume_recording()
         self.adapter.resume_recording()
         return True
 
@@ -1512,10 +1516,17 @@ class BotController:
             # The internal pipeline needs to stop recording.
             self.pause_recording_for_pipeline_objects_raise_on_failure()
 
+            if message.get("denied_reason") == BotAdapter.BOT_RECORDING_PERMISSION_DENIED_REASON.HOST_DENIED_PERMISSION:
+                event_sub_type_for_permission_denied = BotEventSubTypes.BOT_RECORDING_PERMISSION_DENIED_HOST_DENIED_PERMISSION
+            elif message.get("denied_reason") == BotAdapter.BOT_RECORDING_PERMISSION_DENIED_REASON.REQUEST_TIMED_OUT:
+                event_sub_type_for_permission_denied = BotEventSubTypes.BOT_RECORDING_PERMISSION_DENIED_REQUEST_TIMED_OUT
+            else:
+                raise Exception(f"Received unexpected denied reason from bot adapter: {message.get('denied_reason')}")
+
             BotEventManager.create_event(
                 bot=self.bot_in_db,
                 event_type=BotEventTypes.BOT_RECORDING_PERMISSION_DENIED,
-                event_sub_type=BotEventSubTypes.BOT_RECORDING_PERMISSION_DENIED_HOST_DENIED_PERMISSION,
+                event_sub_type=event_sub_type_for_permission_denied,
             )
             return
 

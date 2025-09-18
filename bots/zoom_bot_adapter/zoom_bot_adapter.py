@@ -125,6 +125,7 @@ class ZoomBotAdapter(BotAdapter):
 
         self.use_raw_recording = True
         self.recording_permission_granted = False
+        self.raw_recording_active = False
 
         self.reminder_controller = None
 
@@ -159,7 +160,6 @@ class ZoomBotAdapter(BotAdapter):
             self.video_input_manager = VideoInputManager(
                 new_frame_callback=self.add_video_frame_callback,
                 wants_any_frames_callback=self.wants_any_video_frames_callback,
-                recording_is_paused_callback=self.get_recording_is_paused,
                 video_frame_size=self.video_frame_size,
             )
         else:
@@ -205,12 +205,17 @@ class ZoomBotAdapter(BotAdapter):
 
     def pause_recording(self):
         self.recording_is_paused = True
-
+        if not self.raw_recording_active:
+            return
+        self.stop_raw_recording()
+        self.set_video_input_manager_based_on_state()
+        
     def resume_recording(self):
         self.recording_is_paused = False
-
-    def get_recording_is_paused(self):
-        return self.recording_is_paused
+        if self.raw_recording_active:
+            return
+        self.start_raw_recording()
+        GLib.timeout_add(100, self.set_up_video_input_manager)
 
     def request_permission_to_record_if_joined_user_is_host(self, joined_user_id):
         # No need to request permission if we already have it
@@ -272,6 +277,16 @@ class ZoomBotAdapter(BotAdapter):
             return
 
         if not self.video_input_manager:
+            return
+
+        if self.recording_is_paused:
+            logger.info("set_video_input_manager_based_on_state recording is paused")
+            self.video_input_manager.set_mode(
+                mode=VideoInputManager.Mode.PAUSED,
+                active_speaker_id=None,
+                active_sharer_id=None,
+                active_sharer_source_id=None,
+            )
             return
 
         logger.info(f"set_video_input_manager_based_on_state self.active_speaker_id = {self.active_speaker_id}, self.active_sharer_id = {self.active_sharer_id}, self.active_sharer_source_id = {self.active_sharer_source_id}")
@@ -554,22 +569,35 @@ class ZoomBotAdapter(BotAdapter):
         if self.use_raw_recording:
             self.recording_ctrl = self.meeting_service.GetMeetingRecordingController()
 
+            # Wire up callbacks for changes to recording privilege
+
             def on_recording_privilege_changed(can_rec):
                 logger.info(f"on_recording_privilege_changed called. can_record = {can_rec}")
                 if can_rec:
-                    self.start_raw_recording()
+                    self.handle_recording_permission_granted()
                 elif self.recording_permission_granted:
-                    self.handle_recording_permission_denied()
+                    self.handle_recording_permission_denied(reason=BotAdapter.BOT_RECORDING_PERMISSION_DENIED_REASON.HOST_DENIED_PERMISSION)
 
             def on_local_recording_privilege_request_status_changed(status):
                 logger.info(f"on_local_recording_privilege_request_status called. status = {status}")
                 if status == zoom.RequestLocalRecordingStatus.RequestLocalRecording_Denied:
-                    self.handle_recording_permission_denied()
+                    self.handle_recording_permission_denied(reason=BotAdapter.BOT_RECORDING_PERMISSION_DENIED_REASON.HOST_DENIED_PERMISSION)
+                if status == zoom.RequestLocalRecordingStatus.RequestLocalRecording_Timeout:
+                    self.handle_recording_permission_denied(reason=BotAdapter.BOT_RECORDING_PERMISSION_DENIED_REASON.REQUEST_TIMED_OUT)
 
             self.recording_event = zoom.MeetingRecordingCtrlEventCallbacks(onRecordPrivilegeChangedCallback=on_recording_privilege_changed, onLocalRecordingPrivilegeRequestStatusCallback=on_local_recording_privilege_request_status_changed)
             self.recording_ctrl.SetEvent(self.recording_event)
 
-            self.start_raw_recording()
+            # Check if we can start recording.
+            # If we can then start it
+            # If we can't then request it
+
+            can_start_recording_result = self.recording_ctrl.CanStartRawRecording()
+            if can_start_recording_result != zoom.SDKERR_SUCCESS:
+                self.recording_ctrl.RequestLocalRecordingPrivilege()
+                logger.info("Requesting recording privilege.")
+            else:
+                self.handle_recording_permission_granted()
 
         # Apply meeting settings
         self.apply_meeting_settings()
@@ -749,23 +777,11 @@ class ZoomBotAdapter(BotAdapter):
 
     def add_mixed_audio_chunk_convert_to_bytes(self, data):
         if self.recording_is_paused:
-            # Send zeros instead of real audio data if recording is paused
-            zero_buffer = bytes(len(data.GetBuffer()))
-            self.add_mixed_audio_chunk_callback(chunk=zero_buffer)
             return
         self.add_mixed_audio_chunk_callback(chunk=data.GetBuffer())
 
-    def start_raw_recording(self):
-        can_start_recording_result = self.recording_ctrl.CanStartRawRecording()
-        if can_start_recording_result != zoom.SDKERR_SUCCESS:
-            self.recording_ctrl.RequestLocalRecordingPrivilege()
-            logger.info("Requesting recording privilege.")
-            return
-
-        start_raw_recording_result = self.recording_ctrl.StartRawRecording()
-        if start_raw_recording_result != zoom.SDKERR_SUCCESS:
-            logger.info("Start raw recording failed.")
-            return
+    def handle_recording_permission_granted(self):
+        self.start_raw_recording()
 
         if self.audio_helper is None:
             self.audio_helper = zoom.GetAudioRawdataHelper()
@@ -790,12 +806,22 @@ class ZoomBotAdapter(BotAdapter):
         GLib.timeout_add(100, self.set_up_video_input_manager)
 
     def stop_raw_recording(self):
-        rec_ctrl = self.meeting_service.StopRawRecording()
-        if rec_ctrl.StopRawRecording() != zoom.SDKERR_SUCCESS:
-            raise Exception("Error with stop raw recording")
+        logger.info("Stopping raw recording")
+        stop_raw_recording_result = self.recording_ctrl.StopRawRecording()
+        if stop_raw_recording_result != zoom.SDKERR_SUCCESS:
+            logger.info(f"Error with stop_raw_recording_result = {stop_raw_recording_result}")
+        else:
+            self.raw_recording_active = False
 
-    def handle_recording_permission_denied(self):
-        self.send_message_callback({"message": self.Messages.BOT_RECORDING_PERMISSION_DENIED})
+    def start_raw_recording(self):
+        start_raw_recording_result = self.recording_ctrl.StartRawRecording()
+        if start_raw_recording_result != zoom.SDKERR_SUCCESS:
+            logger.info(f"Error with start_raw_recording_result = {start_raw_recording_result}")
+        else:
+            self.raw_recording_active = True
+
+    def handle_recording_permission_denied(self, reason):
+        self.send_message_callback({"message": self.Messages.BOT_RECORDING_PERMISSION_DENIED, "denied_reason": reason})
         self.recording_permission_granted = False
 
     def leave(self):

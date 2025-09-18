@@ -4,9 +4,58 @@ gi.require_version("Gst", "1.0")
 import logging
 import time
 
+import numpy as np
 from gi.repository import GLib, Gst
 
 logger = logging.getLogger(__name__)
+
+
+def create_black_i420_frame(video_frame_size):
+    """Create a black I420 frame for the given dimensions"""
+    width, height = video_frame_size
+    # Ensure dimensions are even for proper chroma subsampling
+    if width % 2 != 0 or height % 2 != 0:
+        raise ValueError("Width and height must be even numbers for I420 format")
+
+    # Y plane (black = 0 in Y plane)
+    y_plane = np.zeros((height, width), dtype=np.uint8)
+
+    # U and V planes (black = 128 in UV planes)
+    # Both are quarter size of original due to 4:2:0 subsampling
+    u_plane = np.full((height // 2, width // 2), 128, dtype=np.uint8)
+    v_plane = np.full((height // 2, width // 2), 128, dtype=np.uint8)
+
+    # Concatenate all planes
+    yuv_frame = np.concatenate([y_plane.flatten(), u_plane.flatten(), v_plane.flatten()])
+
+    return yuv_frame.astype(np.uint8).tobytes()
+
+
+def create_zero_pcm_audio(audio_format, duration_ms=250):
+    """Create zero'd PCM audio for the given format and duration"""
+    # Parse the audio format to get sample rate and format
+    if "rate=32000" in audio_format:
+        sample_rate = 32000
+    elif "rate=48000" in audio_format:
+        sample_rate = 48000
+    else:
+        # Default to 32000 if not specified
+        sample_rate = 32000
+    
+    # Calculate number of samples for the duration
+    samples_count = int((duration_ms / 1000.0) * sample_rate)
+    
+    if "format=S16LE" in audio_format:
+        # 16-bit signed little endian
+        zero_audio = np.zeros(samples_count, dtype=np.int16)
+    elif "format=F32LE" in audio_format:
+        # 32-bit float little endian
+        zero_audio = np.zeros(samples_count, dtype=np.float32)
+    else:
+        # Default to S16LE
+        zero_audio = np.zeros(samples_count, dtype=np.int16)
+    
+    return zero_audio.tobytes()
 
 
 class GstreamerPipeline:
@@ -45,6 +94,9 @@ class GstreamerPipeline:
         self.audio_recording_active = False
 
         self.start_time_ns = None  # Will be set on first frame/audio sample
+
+        # Pause state tracking
+        self.pause_timer_id = None
 
         # Initialize GStreamer
         Gst.init(None)
@@ -215,6 +267,25 @@ class GstreamerPipeline:
 
         return True  # Continue timer
 
+    def send_pause_frames(self):
+        """Send black frames and zero audio while paused"""
+        if not self.recording_active:
+            return False  # Stop timer if recording is no longer active
+        
+        current_time_ns = time.time_ns()
+        
+        # Send black video frame if video is enabled by calling existing method
+        if self.appsrc and self.output_format != self.OUTPUT_FORMAT_MP3:
+            black_frame = create_black_i420_frame(self.video_frame_size)
+            self.on_new_video_frame(black_frame, current_time_ns)
+        
+        # Send zero audio for all audio sources by calling existing method
+        if self.audio_recording_active and self.audio_appsrcs:
+            zero_audio = create_zero_pcm_audio(self.audio_format, duration_ms=250)
+            self.on_mixed_audio_raw_data_received_callback(zero_audio, current_time_ns)
+        
+        return True  # Continue timer
+
     def on_queue_overrun(self, queue, queue_name):
         """Callback for when a queue drops buffers"""
         self.queue_drops[queue_name] += 1
@@ -250,7 +321,7 @@ class GstreamerPipeline:
 
         return True
 
-    def on_new_video_frame(self, frame, current_time_ns):
+    def on_new_video_frame(self, frame, current_time_ns):          
         try:
             # Initialize start time if not set
             if self.start_time_ns is None:
@@ -273,6 +344,27 @@ class GstreamerPipeline:
 
         except Exception as e:
             logger.info(f"Error processing video frame: {e}")
+
+    def pause_recording(self):
+        """Pause the pipeline and start sending black frames and zero audio"""
+        if self.pause_timer_id is not None:
+            return
+        
+        logger.info("Pausing GStreamer pipeline - switching to black frames and zero audio")
+        
+        # Start the pause timer to send black frames and zero audio every 250ms
+        self.pause_timer_id = GLib.timeout_add(250, self.send_pause_frames)
+
+    def resume_recording(self):
+        """Unpause the pipeline and resume normal operation"""
+        if self.pause_timer_id is None:
+            return
+        
+        logger.info("Unpausing GStreamer pipeline - resuming normal operation")
+        
+        # Stop the pause timer
+        GLib.source_remove(self.pause_timer_id)
+        self.pause_timer_id = None
 
     def cleanup(self):
         logger.info("Shutting down GStreamer pipeline...")

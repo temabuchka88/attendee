@@ -164,7 +164,7 @@ class VideoInputStream:
             return False
 
         current_time = time.time()
-        if current_time - self.last_frame_time >= 0.25 and (self.raw_data_status == zoom.RawData_Off or self.video_input_manager.recording_is_paused()):
+        if current_time - self.last_frame_time >= 0.25 and self.raw_data_status == zoom.RawData_Off:
             # Create a black frame of the same dimensions
             black_frame = create_black_i420_frame(self.video_input_manager.video_frame_size)
             self.video_input_manager.new_frame_callback(black_frame, time.time_ns())
@@ -194,9 +194,6 @@ class VideoInputStream:
         if self.renderer_destroyed:
             return
 
-        if self.video_input_manager.recording_is_paused():
-            return
-
         if not self.video_input_manager.wants_frames_for_user(self.user_id):
             return
 
@@ -224,11 +221,11 @@ class VideoInputManager:
     class Mode:
         ACTIVE_SPEAKER = 1
         ACTIVE_SHARER = 2
+        PAUSED = 3
 
-    def __init__(self, *, new_frame_callback, wants_any_frames_callback, video_frame_size, recording_is_paused_callback):
+    def __init__(self, *, new_frame_callback, wants_any_frames_callback, video_frame_size):
         self.new_frame_callback = new_frame_callback
         self.wants_any_frames_callback = wants_any_frames_callback
-        self.recording_is_paused_callback = recording_is_paused_callback
         self.video_frame_size = video_frame_size
         self.mode = None
         self.input_streams = []
@@ -261,12 +258,16 @@ class VideoInputManager:
             input_stream.cleanup()
 
     def set_mode(self, *, mode, active_speaker_id, active_sharer_id, active_sharer_source_id):
-        if mode != VideoInputManager.Mode.ACTIVE_SPEAKER and mode != VideoInputManager.Mode.ACTIVE_SHARER:
+        if mode != VideoInputManager.Mode.ACTIVE_SPEAKER and mode != VideoInputManager.Mode.ACTIVE_SHARER and mode != VideoInputManager.Mode.PAUSED:
             raise Exception("Unsupported mode " + str(mode))
 
         logger.info(f"In VideoInputManager.set_mode mode = {mode} active_speaker_id = {active_speaker_id} active_sharer_id = {active_sharer_id} active_sharer_source_id = {active_sharer_source_id}")
 
         self.mode = mode
+
+        if self.mode == VideoInputManager.Mode.PAUSED:
+            self.add_input_streams_if_needed([])
+            return
 
         if self.mode == VideoInputManager.Mode.ACTIVE_SPEAKER:
             self.active_speaker_id = active_speaker_id
@@ -292,9 +293,6 @@ class VideoInputManager:
                     }
                 ]
             )
-
-    def recording_is_paused(self):
-        return self.recording_is_paused_callback()
 
     def wants_frames_for_user(self, user_id):
         if not self.wants_any_frames_callback():
