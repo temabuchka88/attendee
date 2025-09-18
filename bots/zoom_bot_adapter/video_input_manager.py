@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 from bots.utils import create_black_i420_frame
 
+
 def scale_i420(frame, new_size):
     new_width, new_height = new_size
     """
@@ -202,7 +203,7 @@ class VideoInputManager:
     class Mode:
         ACTIVE_SPEAKER = 1
         ACTIVE_SHARER = 2
-        PAUSED = 3
+        INACTIVE = 3
 
     def __init__(self, *, new_frame_callback, wants_any_frames_callback, video_frame_size):
         self.new_frame_callback = new_frame_callback
@@ -239,14 +240,14 @@ class VideoInputManager:
             input_stream.cleanup()
 
     def set_mode(self, *, mode, active_speaker_id, active_sharer_id, active_sharer_source_id):
-        if mode != VideoInputManager.Mode.ACTIVE_SPEAKER and mode != VideoInputManager.Mode.ACTIVE_SHARER and mode != VideoInputManager.Mode.PAUSED:
+        if mode != VideoInputManager.Mode.ACTIVE_SPEAKER and mode != VideoInputManager.Mode.ACTIVE_SHARER and mode != VideoInputManager.Mode.INACTIVE:
             raise Exception("Unsupported mode " + str(mode))
 
         logger.info(f"In VideoInputManager.set_mode mode = {mode} active_speaker_id = {active_speaker_id} active_sharer_id = {active_sharer_id} active_sharer_source_id = {active_sharer_source_id}")
 
         self.mode = mode
 
-        if self.mode == VideoInputManager.Mode.PAUSED:
+        if self.mode == VideoInputManager.Mode.INACTIVE:
             self.add_input_streams_if_needed([])
             return
 

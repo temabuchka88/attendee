@@ -112,6 +112,7 @@ def calculate_audio_duration_ms(audio_data: bytes, content_type: str) -> int:
     duration_ms = len(audio)
     return duration_ms
 
+
 def create_zero_pcm_audio(audio_format, duration_ms=250):
     """Create zero'd PCM audio for the given format and duration"""
     # Parse the audio format to get sample rate and format
@@ -138,6 +139,7 @@ def create_zero_pcm_audio(audio_format, duration_ms=250):
 
     return zero_audio.tobytes()
 
+
 def create_black_i420_frame(video_frame_size):
     """Create a black I420 frame for the given dimensions"""
     width, height = video_frame_size
@@ -157,6 +159,7 @@ def create_black_i420_frame(video_frame_size):
     yuv_frame = np.concatenate([y_plane.flatten(), u_plane.flatten(), v_plane.flatten()])
 
     return yuv_frame.astype(np.uint8).tobytes()
+
 
 def half_ceil(x):
     return (x + 1) // 2

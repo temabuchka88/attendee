@@ -930,27 +930,27 @@ class BotController:
             event_type=BotEventTypes.RECORDING_PAUSED,
         )
 
-    def resume_recording_for_pipeline_objects(self):
+    def start_or_resume_recording_for_pipeline_objects(self):
         resume_recording_success = self.screen_and_audio_recorder.resume_recording() if self.screen_and_audio_recorder else True
         if not resume_recording_success:
             logger.error(f"Failed to resume recording for bot {self.bot_in_db.object_id}")
             return False
         if self.gstreamer_pipeline:
             self.gstreamer_pipeline.resume_recording()
-        self.adapter.resume_recording()
+        self.adapter.start_or_resume_recording()
         return True
 
-    def resume_recording_for_pipeline_objects_raise_on_failure(self):
-        resume_recording_for_pipeline_objects_success = self.resume_recording_for_pipeline_objects()
-        if not resume_recording_for_pipeline_objects_success:
+    def start_or_resume_recording_for_pipeline_objects_raise_on_failure(self):
+        start_or_resume_recording_for_pipeline_objects_success = self.start_or_resume_recording_for_pipeline_objects()
+        if not start_or_resume_recording_for_pipeline_objects_success:
             raise Exception(f"Failed to resume recording for bot {self.bot_in_db.object_id}")
 
     def resume_recording(self):
         if not BotEventManager.is_state_that_can_resume_recording(self.bot_in_db.state):
             logger.info(f"Bot {self.bot_in_db.object_id} is in state {BotStates.state_to_api_code(self.bot_in_db.state)} and cannot resume recording")
             return
-        resume_recording_for_pipeline_objects_success = self.resume_recording_for_pipeline_objects()
-        if not resume_recording_for_pipeline_objects_success:
+        start_or_resume_recording_for_pipeline_objects_success = self.start_or_resume_recording_for_pipeline_objects()
+        if not start_or_resume_recording_for_pipeline_objects_success:
             logger.error(f"Failed to resume recording for bot {self.bot_in_db.object_id}")
             return
         BotEventManager.create_event(
@@ -1500,7 +1500,7 @@ class BotController:
             logger.info("Received message that bot recording permission granted")
 
             # The internal pipeline needs to start or resume recording.
-            self.resume_recording_for_pipeline_objects_raise_on_failure()
+            self.start_or_resume_recording_for_pipeline_objects_raise_on_failure()
 
             BotEventManager.create_event(
                 bot=self.bot_in_db,

@@ -109,7 +109,7 @@ class WebBotAdapter(BotAdapter):
     def pause_recording(self):
         self.recording_paused = True
 
-    def resume_recording(self):
+    def start_or_resume_recording(self):
         self.recording_paused = False
 
     def process_encoded_mp4_chunk(self, message):

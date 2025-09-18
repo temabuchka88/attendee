@@ -4,12 +4,12 @@ gi.require_version("Gst", "1.0")
 import logging
 import time
 
-import numpy as np
 from gi.repository import GLib, Gst
 
 from bots.utils import create_black_i420_frame, create_zero_pcm_audio
 
 logger = logging.getLogger(__name__)
+
 
 class GstreamerPipeline:
     AUDIO_FORMAT_PCM = "audio/x-raw,format=S16LE,channels=1,rate=32000,layout=interleaved"
@@ -56,8 +56,6 @@ class GstreamerPipeline:
 
         self.queue_drops = {}
         self.last_reported_drops = {}
-
-        
 
     def on_new_sample_from_appsink(self, sink):
         """Handle new samples from the appsink"""

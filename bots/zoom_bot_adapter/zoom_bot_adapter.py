@@ -209,15 +209,13 @@ class ZoomBotAdapter(BotAdapter):
             logger.info("returning early from pause_recording because raw recording is not active")
             return
         self.stop_raw_recording()
-        self.set_video_input_manager_based_on_state()
 
-    def resume_recording(self):
+    def start_or_resume_recording(self):
         self.recording_is_paused = False
         if self.raw_recording_active:
             logger.info("returning early from resume_recording because raw recording is active")
             return
         self.start_raw_recording()
-        GLib.timeout_add(100, self.set_up_video_input_manager)
 
     def request_permission_to_record_if_joined_user_is_host(self, joined_user_id):
         # No need to request permission if we already have it
@@ -269,11 +267,9 @@ class ZoomBotAdapter(BotAdapter):
         self.set_video_input_manager_based_on_state()
 
     def set_video_input_manager_based_on_state(self):
-
-        if self.recording_is_paused and self.video_input_manager:
-            logger.info("set_video_input_manager_based_on_state recording is paused")
+        if not self.raw_recording_active and self.video_input_manager:
             self.video_input_manager.set_mode(
-                mode=VideoInputManager.Mode.PAUSED,
+                mode=VideoInputManager.Mode.INACTIVE,
                 active_speaker_id=None,
                 active_sharer_id=None,
                 active_sharer_source_id=None,
@@ -797,6 +793,8 @@ class ZoomBotAdapter(BotAdapter):
         else:
             self.raw_recording_active = False
             logger.info(f"Raw recording stopped stop_raw_recording_result = {stop_raw_recording_result}")
+
+        self.set_video_input_manager_based_on_state()
 
     def start_raw_recording(self):
         logger.info("Starting raw recording")
