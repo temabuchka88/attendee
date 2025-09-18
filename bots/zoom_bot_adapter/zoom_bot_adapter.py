@@ -206,6 +206,7 @@ class ZoomBotAdapter(BotAdapter):
     def pause_recording(self):
         self.recording_is_paused = True
         if not self.raw_recording_active:
+            logger.info("returning early from pause_recording because raw recording is not active")
             return
         self.stop_raw_recording()
         self.set_video_input_manager_based_on_state()
@@ -213,6 +214,7 @@ class ZoomBotAdapter(BotAdapter):
     def resume_recording(self):
         self.recording_is_paused = False
         if self.raw_recording_active:
+            logger.info("returning early from resume_recording because raw recording is active")
             return
         self.start_raw_recording()
         GLib.timeout_add(100, self.set_up_video_input_manager)
@@ -267,6 +269,17 @@ class ZoomBotAdapter(BotAdapter):
         self.set_video_input_manager_based_on_state()
 
     def set_video_input_manager_based_on_state(self):
+
+        if self.recording_is_paused and self.video_input_manager:
+            logger.info("set_video_input_manager_based_on_state recording is paused")
+            self.video_input_manager.set_mode(
+                mode=VideoInputManager.Mode.PAUSED,
+                active_speaker_id=None,
+                active_sharer_id=None,
+                active_sharer_source_id=None,
+            )
+            return
+
         if not self.wants_any_video_frames_callback():
             return
 
@@ -277,16 +290,6 @@ class ZoomBotAdapter(BotAdapter):
             return
 
         if not self.video_input_manager:
-            return
-
-        if self.recording_is_paused:
-            logger.info("set_video_input_manager_based_on_state recording is paused")
-            self.video_input_manager.set_mode(
-                mode=VideoInputManager.Mode.PAUSED,
-                active_speaker_id=None,
-                active_sharer_id=None,
-                active_sharer_source_id=None,
-            )
             return
 
         logger.info(f"set_video_input_manager_based_on_state self.active_speaker_id = {self.active_speaker_id}, self.active_sharer_id = {self.active_sharer_id}, self.active_sharer_source_id = {self.active_sharer_source_id}")
@@ -781,7 +784,28 @@ class ZoomBotAdapter(BotAdapter):
         self.add_mixed_audio_chunk_callback(chunk=data.GetBuffer())
 
     def handle_recording_permission_granted(self):
-        self.start_raw_recording()
+        if not self.recording_permission_granted:
+            self.send_message_callback({"message": self.Messages.BOT_RECORDING_PERMISSION_GRANTED})
+            self.recording_permission_granted = True
+
+    def stop_raw_recording(self):
+        logger.info("Stopping raw recording")
+        stop_raw_recording_result = self.recording_ctrl.StopRawRecording()
+        # SDKERR_TOO_FREQUENT_CALL means it was already called recently
+        if stop_raw_recording_result != zoom.SDKERR_SUCCESS and stop_raw_recording_result != zoom.SDKERR_TOO_FREQUENT_CALL:
+            logger.info(f"Error with stop_raw_recording_result = {stop_raw_recording_result}")
+        else:
+            self.raw_recording_active = False
+            logger.info(f"Raw recording stopped stop_raw_recording_result = {stop_raw_recording_result}")
+
+    def start_raw_recording(self):
+        logger.info("Starting raw recording")
+        start_raw_recording_result = self.recording_ctrl.StartRawRecording()
+        if start_raw_recording_result != zoom.SDKERR_SUCCESS:
+            logger.info(f"Error with start_raw_recording_result = {start_raw_recording_result}")
+        else:
+            self.raw_recording_active = True
+            logger.info("Raw recording started")
 
         if self.audio_helper is None:
             self.audio_helper = zoom.GetAudioRawdataHelper()
@@ -799,26 +823,7 @@ class ZoomBotAdapter(BotAdapter):
         audio_helper_subscribe_result = self.audio_helper.subscribe(self.audio_source, False)
         logger.info(f"audio_helper_subscribe_result = {audio_helper_subscribe_result}")
 
-        if not self.recording_permission_granted:
-            self.send_message_callback({"message": self.Messages.BOT_RECORDING_PERMISSION_GRANTED})
-            self.recording_permission_granted = True
-
         GLib.timeout_add(100, self.set_up_video_input_manager)
-
-    def stop_raw_recording(self):
-        logger.info("Stopping raw recording")
-        stop_raw_recording_result = self.recording_ctrl.StopRawRecording()
-        if stop_raw_recording_result != zoom.SDKERR_SUCCESS:
-            logger.info(f"Error with stop_raw_recording_result = {stop_raw_recording_result}")
-        else:
-            self.raw_recording_active = False
-
-    def start_raw_recording(self):
-        start_raw_recording_result = self.recording_ctrl.StartRawRecording()
-        if start_raw_recording_result != zoom.SDKERR_SUCCESS:
-            logger.info(f"Error with start_raw_recording_result = {start_raw_recording_result}")
-        else:
-            self.raw_recording_active = True
 
     def handle_recording_permission_denied(self, reason):
         self.send_message_callback({"message": self.Messages.BOT_RECORDING_PERMISSION_DENIED, "denied_reason": reason})

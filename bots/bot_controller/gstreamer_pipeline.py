@@ -7,56 +7,9 @@ import time
 import numpy as np
 from gi.repository import GLib, Gst
 
+from bots.utils import create_black_i420_frame, create_zero_pcm_audio
+
 logger = logging.getLogger(__name__)
-
-
-def create_black_i420_frame(video_frame_size):
-    """Create a black I420 frame for the given dimensions"""
-    width, height = video_frame_size
-    # Ensure dimensions are even for proper chroma subsampling
-    if width % 2 != 0 or height % 2 != 0:
-        raise ValueError("Width and height must be even numbers for I420 format")
-
-    # Y plane (black = 0 in Y plane)
-    y_plane = np.zeros((height, width), dtype=np.uint8)
-
-    # U and V planes (black = 128 in UV planes)
-    # Both are quarter size of original due to 4:2:0 subsampling
-    u_plane = np.full((height // 2, width // 2), 128, dtype=np.uint8)
-    v_plane = np.full((height // 2, width // 2), 128, dtype=np.uint8)
-
-    # Concatenate all planes
-    yuv_frame = np.concatenate([y_plane.flatten(), u_plane.flatten(), v_plane.flatten()])
-
-    return yuv_frame.astype(np.uint8).tobytes()
-
-
-def create_zero_pcm_audio(audio_format, duration_ms=250):
-    """Create zero'd PCM audio for the given format and duration"""
-    # Parse the audio format to get sample rate and format
-    if "rate=32000" in audio_format:
-        sample_rate = 32000
-    elif "rate=48000" in audio_format:
-        sample_rate = 48000
-    else:
-        # Default to 32000 if not specified
-        sample_rate = 32000
-
-    # Calculate number of samples for the duration
-    samples_count = int((duration_ms / 1000.0) * sample_rate)
-
-    if "format=S16LE" in audio_format:
-        # 16-bit signed little endian
-        zero_audio = np.zeros(samples_count, dtype=np.int16)
-    elif "format=F32LE" in audio_format:
-        # 32-bit float little endian
-        zero_audio = np.zeros(samples_count, dtype=np.float32)
-    else:
-        # Default to S16LE
-        zero_audio = np.zeros(samples_count, dtype=np.int16)
-
-    return zero_audio.tobytes()
-
 
 class GstreamerPipeline:
     AUDIO_FORMAT_PCM = "audio/x-raw,format=S16LE,channels=1,rate=32000,layout=interleaved"
@@ -103,6 +56,8 @@ class GstreamerPipeline:
 
         self.queue_drops = {}
         self.last_reported_drops = {}
+
+        
 
     def on_new_sample_from_appsink(self, sink):
         """Handle new samples from the appsink"""
@@ -277,12 +232,12 @@ class GstreamerPipeline:
         # Send black video frame if video is enabled by calling existing method
         if self.appsrc and self.output_format != self.OUTPUT_FORMAT_MP3:
             black_frame = create_black_i420_frame(self.video_frame_size)
-            self.on_new_video_frame(black_frame, current_time_ns)
+            self.on_new_video_frame(black_frame, current_time_ns, is_pause_frame=True)
 
         # Send zero audio for all audio sources by calling existing method
         if self.audio_recording_active and self.audio_appsrcs:
             zero_audio = create_zero_pcm_audio(self.audio_format, duration_ms=250)
-            self.on_mixed_audio_raw_data_received_callback(zero_audio, current_time_ns)
+            self.on_mixed_audio_raw_data_received_callback(zero_audio, current_time_ns, is_pause_frame=True)
 
         return True  # Continue timer
 
@@ -291,7 +246,10 @@ class GstreamerPipeline:
         self.queue_drops[queue_name] += 1
         return True
 
-    def on_mixed_audio_raw_data_received_callback(self, data, timestamp=None, audio_appsrc_idx=0):
+    def on_mixed_audio_raw_data_received_callback(self, data, timestamp=None, audio_appsrc_idx=0, is_pause_frame=False):
+        if self.pause_timer_id is not None and not is_pause_frame:
+            return
+
         audio_appsrc = self.audio_appsrcs[audio_appsrc_idx]
 
         if not self.audio_recording_active or not audio_appsrc or not self.recording_active or (not self.appsrc and self.output_format != self.OUTPUT_FORMAT_MP3):
@@ -321,7 +279,10 @@ class GstreamerPipeline:
 
         return True
 
-    def on_new_video_frame(self, frame, current_time_ns):
+    def on_new_video_frame(self, frame, current_time_ns, is_pause_frame=False):
+        if self.pause_timer_id is not None and not is_pause_frame:
+            return
+
         try:
             # Initialize start time if not set
             if self.start_time_ns is None:

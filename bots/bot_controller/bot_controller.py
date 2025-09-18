@@ -934,7 +934,7 @@ class BotController:
         resume_recording_success = self.screen_and_audio_recorder.resume_recording() if self.screen_and_audio_recorder else True
         if not resume_recording_success:
             logger.error(f"Failed to resume recording for bot {self.bot_in_db.object_id}")
-            return
+            return False
         if self.gstreamer_pipeline:
             self.gstreamer_pipeline.resume_recording()
         self.adapter.resume_recording()
@@ -1499,8 +1499,7 @@ class BotController:
         if message.get("message") == BotAdapter.Messages.BOT_RECORDING_PERMISSION_GRANTED:
             logger.info("Received message that bot recording permission granted")
 
-            # If the bot had an in progress recording and we get permission granted, then it means the recording permission was granted after being formerly revoked.
-            # The internal pipeline needs to resume recording.
+            # The internal pipeline needs to start or resume recording.
             self.resume_recording_for_pipeline_objects_raise_on_failure()
 
             BotEventManager.create_event(
@@ -1512,7 +1511,6 @@ class BotController:
         if message.get("message") == BotAdapter.Messages.BOT_RECORDING_PERMISSION_DENIED:
             logger.info("Received message that bot recording permission denied")
 
-            # If the bot had an in progress recording and we get permission denied, then it means the recording permission was revoked.
             # The internal pipeline needs to stop recording.
             self.pause_recording_for_pipeline_objects_raise_on_failure()
 
