@@ -191,6 +191,7 @@ def create_mock_zoom_sdk():
     mock_recording_controller = MagicMock()
     mock_recording_controller.CanStartRawRecording.return_value = base_mock.SDKERR_SUCCESS
     mock_recording_controller.StartRawRecording.return_value = base_mock.SDKERR_SUCCESS
+    mock_recording_controller.StopRawRecording.return_value = base_mock.SDKERR_SUCCESS
     mock_meeting_service.GetMeetingRecordingController.return_value = mock_recording_controller
 
     mock_auth_service.SetEvent.return_value = base_mock.SDKERR_SUCCESS
