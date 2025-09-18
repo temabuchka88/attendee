@@ -209,7 +209,7 @@ class ZoomBotAdapter(BotAdapter):
             return
         self.stop_raw_recording()
         self.set_video_input_manager_based_on_state()
-        
+
     def resume_recording(self):
         self.recording_is_paused = False
         if self.raw_recording_active:
