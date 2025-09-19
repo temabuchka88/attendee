@@ -316,7 +316,7 @@ def get_transcription_via_assemblyai(utterance):
         return None, {"reason": TranscriptionFailureReasons.CREDENTIALS_NOT_FOUND, "error": "api_key not in credentials"}
 
     headers = {"authorization": api_key}
-    base_url = "https://api.assemblyai.com/v2"
+    base_url = recording.bot.assemblyai_base_url()
 
     payload_mp3 = pcm_to_mp3(utterance.audio_blob.tobytes(), sample_rate=utterance.sample_rate)
 
@@ -347,6 +347,13 @@ def get_transcription_via_assemblyai(utterance):
     speech_model = recording.bot.assemblyai_speech_model()
     if speech_model:
         data["speech_model"] = speech_model
+
+    if recording.bot.assemblyai_speaker_labels():
+        data["speaker_labels"] = True
+
+    language_detection_options = recording.bot.assemblyai_language_detection_options()
+    if language_detection_options:
+        data["language_detection_options"] = language_detection_options
 
     url = f"{base_url}/transcript"
     response = requests.post(url, json=data, headers=headers)
