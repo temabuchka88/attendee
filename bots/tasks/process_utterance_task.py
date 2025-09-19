@@ -395,14 +395,16 @@ def get_transcription_via_assemblyai(utterance):
             formatted_words = []
             if words:
                 for word in words:
-                    formatted_words.append(
-                        {
-                            "word": word["text"],
-                            "start": word["start"] / 1000.0,
-                            "end": word["end"] / 1000.0,
-                            "confidence": word["confidence"],
-                        }
-                    )
+                    formatted_word = {
+                        "word": word["text"],
+                        "start": word["start"] / 1000.0,
+                        "end": word["end"] / 1000.0,
+                        "confidence": word["confidence"],
+                    }
+                    if "speaker" in word:
+                        formatted_word["speaker"] = word["speaker"]
+
+                    formatted_words.append(formatted_word)
 
             transcription = {"transcript": transcript_text, "words": formatted_words}
             return transcription, None
