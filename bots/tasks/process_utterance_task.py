@@ -406,7 +406,7 @@ def get_transcription_via_assemblyai(utterance):
 
                     formatted_words.append(formatted_word)
 
-            transcription = {"transcript": transcript_text, "words": formatted_words}
+            transcription = {"transcript": transcript_text, "words": formatted_words, "language": transcription_result.get("language_code", None)}
             return transcription, None
 
         elif transcription_result["status"] == "error":
