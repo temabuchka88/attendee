@@ -218,7 +218,7 @@ class BotPodCreator:
 
         annotations = {}
         
-        if os.getenv("USING_GKE_AUTOPILOT", "false").lower() == "true":
+        if os.getenv("USE_GKE_EXTENDED_DURATION_FOR_BOT_PODS", "false").lower() == "true":
             annotations["cluster-autoscaler.kubernetes.io/safe-to-evict"] = "false"
 
         if os.getenv("USING_KARPENTER", "false").lower() == "true":
