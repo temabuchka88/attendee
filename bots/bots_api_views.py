@@ -1051,6 +1051,7 @@ class AdmitFromWaitingRoomView(APIView):
     authentication_classes = [ApiKeyAuthentication]
     throttle_classes = [ProjectPostThrottle]
 
+    @extend_schema(exclude=True)
     def post(self, request, object_id):
         try:
             bot = Bot.objects.get(object_id=object_id, project=request.auth.project)
