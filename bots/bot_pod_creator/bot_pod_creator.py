@@ -218,6 +218,8 @@ class BotPodCreator:
 
         annotations = {}
         
+        # Currently, experimenting with this flag to see if it helps with bot pod evictions
+        # It makes the pod take longer to be provisioned, so not enabling by default.
         if os.getenv("USE_GKE_EXTENDED_DURATION_FOR_BOT_PODS", "false").lower() == "true":
             annotations["cluster-autoscaler.kubernetes.io/safe-to-evict"] = "false"
 
