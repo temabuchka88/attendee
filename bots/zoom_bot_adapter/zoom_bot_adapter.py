@@ -597,6 +597,7 @@ class ZoomBotAdapter(BotAdapter):
                 # Check for various reasons why it might be impossible to get the permission
                 is_support_request_local_recording_privilege_result = self.recording_ctrl.IsSupportRequestLocalRecordingPrivilege()
                 logger.info(f"is_support_request_local_recording_privilege_result = {is_support_request_local_recording_privilege_result}")
+                # This means the host is using a zoom client that is incapable of displaying the popup to allow recording (Only known client where this happens is Zoom Rooms)
                 if is_support_request_local_recording_privilege_result == zoom.SDKERR_MEETING_DONT_SUPPORT_FEATURE:
                     self.handle_recording_permission_denied(reason=BotAdapter.BOT_RECORDING_PERMISSION_DENIED_REASON.HOST_CLIENT_CANNOT_GRANT_PERMISSION)
 
