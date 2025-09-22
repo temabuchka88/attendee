@@ -597,9 +597,8 @@ class ZoomBotAdapter(BotAdapter):
                 # Check for various reasons why it might be impossible to get the permission
                 is_support_request_local_recording_privilege_result = self.recording_ctrl.IsSupportRequestLocalRecordingPrivilege()
                 logger.info(f"is_support_request_local_recording_privilege_result = {is_support_request_local_recording_privilege_result}")
-                if is_support_request_local_recording_privilege_result != zoom.SDKERR_SUCCESS:
+                if is_support_request_local_recording_privilege_result == zoom.SDKERR_MEETING_DONT_SUPPORT_FEATURE:
                     self.handle_recording_permission_denied(reason=BotAdapter.BOT_RECORDING_PERMISSION_DENIED_REASON.HOST_CLIENT_CANNOT_GRANT_PERMISSION)
-                    return
 
                 self.recording_ctrl.RequestLocalRecordingPrivilege()
                 logger.info("Requesting recording privilege.")
