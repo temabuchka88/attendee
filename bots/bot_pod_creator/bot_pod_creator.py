@@ -216,6 +216,11 @@ class BotPodCreator:
             bot_pod_labels["network-role"] = "attendee-webpage-streamer-receiver"
 
         annotations = {}
+        
+        if os.getenv("USING_GKE_AUTOPILOT", "false").lower() == "true":
+            annotations["cluster-autoscaler.kubernetes.io/safe-to-evict"] = "false"
+
+
         if os.getenv("USING_KARPENTER", "false").lower() == "true":
             annotations["karpenter.sh/do-not-disrupt"] = "true"
             annotations["karpenter.sh/do-not-evict"] = "true"
