@@ -1719,7 +1719,6 @@ class TranscriptionFailureReasons(models.TextChoices):
     UTTERANCES_STILL_IN_PROGRESS_WHEN_RECORDING_TERMINATED = "utterances_still_in_progress_when_recording_terminated"
 
 
-
 class RecordingJobStates(models.IntegerChoices):
     NOT_STARTED = 1, "Not Started"
     IN_PROGRESS = 2, "In Progress"
@@ -1737,17 +1736,16 @@ class RecordingJobStates(models.IntegerChoices):
         }
         return mapping.get(value)
 
+
 class RecordingJobTypes(models.IntegerChoices):
     POST_MEETING_TRANSCRIPTION = 1, "Post Meeting Transcription"
 
+
 class RecordingJob(models.Model):
     OBJECT_ID_PREFIX = "job_"
-    
+
     object_id = models.CharField(max_length=32, unique=True, editable=False)
-    state = models.IntegerField(
-        choices=RecordingJobStates.choices,
-        default=RecordingJobStates.NOT_STARTED
-    )
+    state = models.IntegerField(choices=RecordingJobStates.choices, default=RecordingJobStates.NOT_STARTED)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="jobs")
@@ -1755,16 +1753,17 @@ class RecordingJob(models.Model):
     failure_data = models.JSONField(null=True, default=None)
     job_type = models.IntegerField(choices=RecordingJobTypes.choices, null=False)
     version = IntegerVersionField()
-    
+
     def save(self, *args, **kwargs):
         if not self.object_id:
             # Generate a random 16-character string
             random_string = "".join(random.choices(string.ascii_letters + string.digits, k=16))
             self.object_id = f"{self.OBJECT_ID_PREFIX}{random_string}"
         super().save(*args, **kwargs)
-    
+
     def __str__(self):
         return f"Recording Job {self.object_id} - {self.get_state_display()}"
+
 
 class RecordingJobManager:
     @classmethod
@@ -1777,11 +1776,11 @@ class RecordingJobManager:
             raise ValueError(f"Invalid state transition. Recording {recording_job.id} is in state {recording_job.get_state_display()}")
 
         recording_job.state = RecordingJobStates.IN_PROGRESS
-        recording.save()
+        recording_job.save()
 
     @classmethod
     def set_recording_job_complete(cls, recording_job: RecordingJob):
-        recording.refresh_from_db()
+        recording_job.refresh_from_db()
 
         if recording_job.state == RecordingJobStates.COMPLETE:
             return
@@ -1789,11 +1788,11 @@ class RecordingJobManager:
             raise ValueError(f"Invalid state transition. Recording {recording_job.id} is in state {recording_job.get_state_display()}")
 
         recording_job.state = RecordingJobStates.COMPLETE
-        recording.save()
+        recording_job.save()
 
     @classmethod
     def set_recording_job_failed(cls, recording_job: RecordingJob, failure_data: dict):
-        recording.refresh_from_db()
+        recording_job.refresh_from_db()
 
         if recording_job.state == RecordingJobStates.FAILED:
             return
@@ -1802,10 +1801,10 @@ class RecordingJobManager:
 
         recording_job.state = RecordingJobStates.FAILED
         recording_job.failure_data = failure_data
-        recording.save()
+        recording_job.save()
+
 
 class AudioChunk(models.Model):
-
     class Sources(models.IntegerChoices):
         PER_PARTICIPANT_AUDIO = 1, "Per Participant Audio"
         MIXED_AUDIO = 2, "Mixed Audio"
@@ -1816,14 +1815,15 @@ class AudioChunk(models.Model):
 
     recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="audio_chunks")
     audio_blob = models.BinaryField()
-    audio_format = models.IntegerField(choices=AudioFormat.choices, default=AudioFormat.PCM, null=True)
+    audio_format = models.IntegerField(choices=AudioFormat.choices, default=AudioFormat.PCM)
     timestamp_ms = models.BigIntegerField()
     duration_ms = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    sample_rate = models.IntegerField(null=True, default=None)
+    sample_rate = models.IntegerField()
 
-    source = models.IntegerField(choices=Sources.choices, default=Sources.PER_PARTICIPANT_AUDIO, null=False)
+    source = models.IntegerField(choices=Sources.choices, default=Sources.PER_PARTICIPANT_AUDIO)
+    participant = models.ForeignKey(Participant, on_delete=models.PROTECT, related_name="audio_chunks")
 
 
 class Utterance(models.Model):
@@ -1865,7 +1865,17 @@ class Utterance(models.Model):
     def __str__(self):
         return f"Utterance at {self.timestamp_ms}ms ({self.duration_ms}ms long)"
 
-    
+    # Helper methods, because we may be working with an outdated model that is still using the audio_blob field
+    # on the utterance model and not using the separate audio chunk model.
+    def get_audio_blob(self):
+        if self.audio_chunk:
+            return self.audio_chunk.audio_blob
+        return self.audio_blob
+
+    def get_sample_rate(self):
+        if self.audio_chunk:
+            return self.audio_chunk.sample_rate
+        return self.sample_rate
 
 
 class Credentials(models.Model):

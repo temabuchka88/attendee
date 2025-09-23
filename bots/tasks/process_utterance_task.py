@@ -79,7 +79,15 @@ def process_utterance(self, utterance_id):
                 logger.info(f"Transcription failed for utterance {utterance_id}, failure data: {failure_data}")
                 return
 
-        utterance.audio_blob = b""  # set the audio blob binary field to empty byte string
+        # The direct audio_blob column on the utterance model is deprecated, but for backwards compatibility, we need to clear it if it exists
+        if utterance.audio_blob:
+            utterance.audio_blob = b""  # set the audio blob binary field to empty byte string
+        # If the utterance has an associated audio chunk, clear the audio blob on the audio chunk
+        if utterance.audio_chunk:
+            utterance_audio_chunk = utterance.audio_chunk
+            utterance_audio_chunk.audio_blob = b""
+            utterance_audio_chunk.save()
+
         utterance.transcription = transcription
         utterance.save()
 
@@ -110,7 +118,7 @@ def get_transcription_via_gladia(utterance):
 
     upload_url = "https://api.gladia.io/v2/upload"
 
-    payload_mp3 = pcm_to_mp3(utterance.audio_blob.tobytes(), sample_rate=utterance.sample_rate)
+    payload_mp3 = pcm_to_mp3(utterance.get_audio_blob().tobytes(), sample_rate=utterance.get_sample_rate())
     headers = {
         "x-gladia-key": gladia_credentials["api_key"],
     }
@@ -209,7 +217,7 @@ def get_transcription_via_deepgram(utterance):
 
     recording = utterance.recording
     payload: FileSource = {
-        "buffer": utterance.audio_blob.tobytes(),
+        "buffer": utterance.get_audio_blob().tobytes(),
     }
 
     deepgram_model = recording.bot.deepgram_model()
@@ -222,7 +230,7 @@ def get_transcription_via_deepgram(utterance):
         keyterm=recording.bot.deepgram_keyterms(),
         keywords=recording.bot.deepgram_keywords(),
         encoding="linear16",  # for 16-bit PCM
-        sample_rate=utterance.sample_rate,
+        sample_rate=utterance.get_sample_rate(),
         redact=recording.bot.deepgram_redaction_settings(),
     )
 
@@ -270,7 +278,7 @@ def get_transcription_via_openai(utterance):
         return {"transcript": ""}, None
 
     # Convert PCM audio to MP3
-    payload_mp3 = pcm_to_mp3(utterance.audio_blob.tobytes(), sample_rate=utterance.sample_rate)
+    payload_mp3 = pcm_to_mp3(utterance.get_audio_blob().tobytes(), sample_rate=utterance.get_sample_rate())
 
     # Prepare the request for OpenAI's transcription API
     base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
@@ -318,7 +326,7 @@ def get_transcription_via_assemblyai(utterance):
     headers = {"authorization": api_key}
     base_url = recording.bot.assemblyai_base_url()
 
-    payload_mp3 = pcm_to_mp3(utterance.audio_blob.tobytes(), sample_rate=utterance.sample_rate)
+    payload_mp3 = pcm_to_mp3(utterance.get_audio_blob().tobytes(), sample_rate=utterance.get_sample_rate())
 
     upload_response = requests.post(f"{base_url}/upload", headers=headers, data=payload_mp3)
 
@@ -452,7 +460,7 @@ def get_transcription_via_sarvam(utterance):
         return {"transcript": ""}, None
 
     # Sarvam says 16kHz sample rate works best
-    payload_mp3 = pcm_to_mp3(utterance.audio_blob.tobytes(), sample_rate=utterance.sample_rate, output_sample_rate=16000)
+    payload_mp3 = pcm_to_mp3(utterance.get_audio_blob().tobytes(), sample_rate=utterance.get_sample_rate(), output_sample_rate=16000)
 
     files = {"file": ("audio.mp3", payload_mp3, "audio/mpeg")}
 
@@ -513,7 +521,7 @@ def get_transcription_via_elevenlabs(utterance):
         return None, {"reason": TranscriptionFailureReasons.CREDENTIALS_NOT_FOUND, "error": "api_key not in credentials"}
 
     # Convert PCM audio to MP3 for ElevenLabs
-    payload_mp3 = pcm_to_mp3(utterance.audio_blob.tobytes(), sample_rate=utterance.sample_rate)
+    payload_mp3 = pcm_to_mp3(utterance.get_audio_blob().tobytes(), sample_rate=utterance.get_sample_rate())
 
     # Prepare the request for ElevenLabs speech-to-text API
     url = "https://api.elevenlabs.io/v1/speech-to-text"
