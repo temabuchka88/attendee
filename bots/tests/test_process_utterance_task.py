@@ -4,6 +4,7 @@ from unittest import mock
 from django.test import TransactionTestCase
 
 from bots.models import (
+    AudioChunk,
     Bot,
     Credentials,
     Organization,
@@ -38,13 +39,13 @@ class ProcessUtteranceTaskTest(TransactionTestCase):
         )
 
         self.participant = Participant.objects.create(bot=self.bot, uuid=str(uuid.uuid4()))
+        self.audio_chunk = AudioChunk.objects.create(recording=self.recording, participant=self.participant, audio_blob=b"rawpcmbytes", timestamp_ms=0, duration_ms=500, sample_rate=16000)
         self.utterance = Utterance.objects.create(
             recording=self.recording,
             participant=self.participant,
-            audio_blob=b"rawpcmbytes",
+            audio_chunk=self.audio_chunk,
             timestamp_ms=0,
             duration_ms=500,
-            sample_rate=16_000,
         )
         self.utterance.refresh_from_db()
 

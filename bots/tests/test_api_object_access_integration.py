@@ -8,6 +8,7 @@ from rest_framework import status
 from accounts.models import Organization
 from bots.models import (
     ApiKey,
+    AudioChunk,
     Bot,
     BotChatMessageRequest,
     BotChatMessageRequestStates,
@@ -70,8 +71,10 @@ class ApiObjectAccessIntegrationTest(TransactionTestCase):
         self.participant_b = Participant.objects.create(bot=self.bot_b, uuid="participant_b_uuid", full_name="Participant B")
 
         # Create utterances for transcript testing
-        self.utterance_a = Utterance.objects.create(recording=self.recording_a, participant=self.participant_a, audio_blob=b"dummy_audio_data", timestamp_ms=1000, duration_ms=2000, transcription={"transcript": "Hello from bot A"})
-        self.utterance_b = Utterance.objects.create(recording=self.recording_b, participant=self.participant_b, audio_blob=b"dummy_audio_data", timestamp_ms=1000, duration_ms=2000, transcription={"transcript": "Hello from bot B"})
+        self.audio_chunk_a = AudioChunk.objects.create(recording=self.recording_a, participant=self.participant_a, audio_blob=b"dummy_audio_data", timestamp_ms=1000, duration_ms=2000, sample_rate=16000)
+        self.audio_chunk_b = AudioChunk.objects.create(recording=self.recording_b, participant=self.participant_b, audio_blob=b"dummy_audio_data", timestamp_ms=1000, duration_ms=2000, sample_rate=16000)
+        self.utterance_a = Utterance.objects.create(recording=self.recording_a, participant=self.participant_a, audio_chunk=self.audio_chunk_a, timestamp_ms=1000, duration_ms=2000, transcription={"transcript": "Hello from bot A"})
+        self.utterance_b = Utterance.objects.create(recording=self.recording_b, participant=self.participant_b, audio_chunk=self.audio_chunk_b, timestamp_ms=1000, duration_ms=2000, transcription={"transcript": "Hello from bot B"})
 
         # Create chat messages
         self.chat_message_a = ChatMessage.objects.create(bot=self.bot_a, participant=self.participant_a, text="Chat message from bot A", to=ChatMessageToOptions.EVERYONE, timestamp=123456789)
