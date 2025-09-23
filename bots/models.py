@@ -1719,6 +1719,113 @@ class TranscriptionFailureReasons(models.TextChoices):
     UTTERANCES_STILL_IN_PROGRESS_WHEN_RECORDING_TERMINATED = "utterances_still_in_progress_when_recording_terminated"
 
 
+
+class RecordingJobStates(models.IntegerChoices):
+    NOT_STARTED = 1, "Not Started"
+    IN_PROGRESS = 2, "In Progress"
+    COMPLETE = 3, "Complete"
+    FAILED = 4, "Failed"
+
+    @classmethod
+    def state_to_api_code(cls, value):
+        """Returns the API code for a given state value"""
+        mapping = {
+            cls.NOT_STARTED: "not_started",
+            cls.IN_PROGRESS: "in_progress",
+            cls.COMPLETE: "complete",
+            cls.FAILED: "failed",
+        }
+        return mapping.get(value)
+
+class RecordingJobTypes(models.IntegerChoices):
+    POST_MEETING_TRANSCRIPTION = 1, "Post Meeting Transcription"
+
+class RecordingJob(models.Model):
+    OBJECT_ID_PREFIX = "job_"
+    
+    object_id = models.CharField(max_length=32, unique=True, editable=False)
+    state = models.IntegerField(
+        choices=RecordingJobStates.choices,
+        default=RecordingJobStates.NOT_STARTED
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="jobs")
+    settings = models.JSONField(null=False, default=dict)
+    failure_data = models.JSONField(null=True, default=None)
+    job_type = models.IntegerField(choices=RecordingJobTypes.choices, null=False)
+    version = IntegerVersionField()
+    
+    def save(self, *args, **kwargs):
+        if not self.object_id:
+            # Generate a random 16-character string
+            random_string = "".join(random.choices(string.ascii_letters + string.digits, k=16))
+            self.object_id = f"{self.OBJECT_ID_PREFIX}{random_string}"
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"Recording Job {self.object_id} - {self.get_state_display()}"
+
+class RecordingJobManager:
+    @classmethod
+    def set_recording_job_in_progress(cls, recording_job: RecordingJob):
+        recording_job.refresh_from_db()
+
+        if recording_job.state == RecordingJobStates.IN_PROGRESS:
+            return
+        if recording_job.state != RecordingJobStates.NOT_STARTED:
+            raise ValueError(f"Invalid state transition. Recording {recording_job.id} is in state {recording_job.get_state_display()}")
+
+        recording_job.state = RecordingJobStates.IN_PROGRESS
+        recording.save()
+
+    @classmethod
+    def set_recording_job_complete(cls, recording_job: RecordingJob):
+        recording.refresh_from_db()
+
+        if recording_job.state == RecordingJobStates.COMPLETE:
+            return
+        if recording_job.state != RecordingJobStates.IN_PROGRESS:
+            raise ValueError(f"Invalid state transition. Recording {recording_job.id} is in state {recording_job.get_state_display()}")
+
+        recording_job.state = RecordingJobStates.COMPLETE
+        recording.save()
+
+    @classmethod
+    def set_recording_job_failed(cls, recording_job: RecordingJob, failure_data: dict):
+        recording.refresh_from_db()
+
+        if recording_job.state == RecordingJobStates.FAILED:
+            return
+        if recording_job.state != RecordingJobStates.IN_PROGRESS:
+            raise ValueError(f"Invalid state transition. Recording {recording_job.id} is in state {recording_job.get_state_display()}")
+
+        recording_job.state = RecordingJobStates.FAILED
+        recording_job.failure_data = failure_data
+        recording.save()
+
+class AudioChunk(models.Model):
+
+    class Sources(models.IntegerChoices):
+        PER_PARTICIPANT_AUDIO = 1, "Per Participant Audio"
+        MIXED_AUDIO = 2, "Mixed Audio"
+
+    class AudioFormat(models.IntegerChoices):
+        PCM = 1, "PCM"
+        MP3 = 2, "MP3"
+
+    recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="audio_chunks")
+    audio_blob = models.BinaryField()
+    audio_format = models.IntegerField(choices=AudioFormat.choices, default=AudioFormat.PCM, null=True)
+    timestamp_ms = models.BigIntegerField()
+    duration_ms = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    sample_rate = models.IntegerField(null=True, default=None)
+
+    source = models.IntegerField(choices=Sources.choices, default=Sources.PER_PARTICIPANT_AUDIO, null=False)
+
+
 class Utterance(models.Model):
     # If transcription is None and failure_data is not None, then the transcription failed
     # If transcription is not None and failure_data is None, then the transcription succeeded
@@ -1733,9 +1840,9 @@ class Utterance(models.Model):
         MP3 = 2, "MP3"
 
     recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="utterances")
+    recording_job = models.ForeignKey(RecordingJob, on_delete=models.CASCADE, related_name="utterances", null=True, blank=True)
+    audio_chunk = models.ForeignKey(AudioChunk, on_delete=models.SET_NULL, related_name="utterances", null=True, blank=True)
     participant = models.ForeignKey(Participant, on_delete=models.PROTECT, related_name="utterances")
-    audio_blob = models.BinaryField()
-    audio_format = models.IntegerField(choices=AudioFormat.choices, default=AudioFormat.PCM, null=True)
     timestamp_ms = models.BigIntegerField()
     duration_ms = models.IntegerField()
     transcription = models.JSONField(null=True, default=None)
@@ -1743,15 +1850,22 @@ class Utterance(models.Model):
     transcription_attempt_count = models.IntegerField(default=0)
     failure_data = models.JSONField(null=True, default=None)
     source_uuid = models.CharField(max_length=255, null=True, unique=True)
-    sample_rate = models.IntegerField(null=True, default=None)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     source = models.IntegerField(choices=Sources.choices, default=Sources.PER_PARTICIPANT_AUDIO, null=False)
 
+    # These columns are deprecated, since we now have a separate AudioChunk model to store info about the source audio
+    # We are keeping them for backwards compatibility. They will eventually be removed.
+    audio_blob = models.BinaryField()
+    audio_format = models.IntegerField(choices=AudioFormat.choices, default=AudioFormat.PCM, null=True)
+    sample_rate = models.IntegerField(null=True, default=None)
+
     def __str__(self):
         return f"Utterance at {self.timestamp_ms}ms ({self.duration_ms}ms long)"
+
+    
 
 
 class Credentials(models.Model):
