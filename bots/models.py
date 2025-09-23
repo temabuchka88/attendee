@@ -324,7 +324,8 @@ class Bot(models.Model):
 
             # Delete all utterances and recording files for each recording
             for recording in self.recordings.all():
-                # Delete all utterances first
+                # Delete all audio chunks and utterances first
+                recording.audio_chunks.all().delete()
                 recording.utterances.all().delete()
 
                 # Delete the actual recording file if it exists
