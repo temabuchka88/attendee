@@ -277,11 +277,13 @@ class TestGoogleMeetBot(TransactionTestCase):
         # Verify utterances were processed
         utterances = Utterance.objects.filter(recording=self.recording)
         self.assertGreater(utterances.count(), 0)
+        self.assertEqual(utterances.count(), self.recording.audio_chunks.count())
 
         # Verify an audio utterance exists with the correct transcription
         audio_utterance = utterances.filter(source=Utterance.Sources.PER_PARTICIPANT_AUDIO, failure_data__isnull=True).first()
         self.assertIsNotNone(audio_utterance)
         self.assertEqual(audio_utterance.transcription.get("transcript"), "This is a test transcription from Deepgram")
+        self.assertEqual(audio_utterance.audio_chunk, self.recording.audio_chunks.first())
 
         # Verify webhook delivery attempts were created for transcript updates
         webhook_delivery_attempts = WebhookDeliveryAttempt.objects.filter(bot=self.bot, webhook_trigger_type=WebhookTriggerTypes.TRANSCRIPT_UPDATE)
