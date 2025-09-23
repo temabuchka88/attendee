@@ -37,6 +37,9 @@ from .models import (
     Participant,
     ParticipantEvent,
     Recording,
+    RecordingArtifact,
+    RecordingArtifactStates,
+    RecordingArtifactTypes,
     Utterance,
 )
 from .serializers import (
@@ -48,10 +51,12 @@ from .serializers import (
     ParticipantEventSerializer,
     ParticipantSerializer,
     PatchBotSerializer,
+    RecordingArtifactSerializer,
     RecordingSerializer,
     SpeechSerializer,
     TranscriptUtteranceSerializer,
 )
+from .tasks import create_post_meeting_transcription
 from .throttling import ProjectPostThrottle
 
 TokenHeaderParameter = [
@@ -745,8 +750,16 @@ class TranscriptView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
+            recording_artifact = None
+            if request.query_params.get("transcript_id"):
+                recording_artifact = recording.artifacts.get(
+                    object_id=request.query_params.get("transcript_id"),
+                    artifact_type=RecordingArtifactTypes.POST_MEETING_TRANSCRIPTION,
+                    state=RecordingArtifactStates.COMPLETE,
+                )
+
             # Get all utterances with transcriptions, sorted by timeline
-            utterances_query = Utterance.objects.select_related("participant").filter(recording=recording, transcription__isnull=False)
+            utterances_query = Utterance.objects.select_related("participant").filter(recording=recording, transcription__isnull=False, recording_artifact=recording_artifact)
 
             # Apply updated_after filter if provided
             updated_after = request.query_params.get("updated_after")
@@ -783,6 +796,40 @@ class TranscriptView(APIView):
             serializer = TranscriptUtteranceSerializer(transcript_data, many=True)
             return Response(serializer.data)
 
+        except Bot.DoesNotExist:
+            return Response({"error": "Bot not found"}, status=status.HTTP_404_NOT_FOUND)
+        except RecordingArtifact.DoesNotExist:
+            return Response({"error": "Transcription not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request, object_id):
+        try:
+            bot = Bot.objects.get(object_id=object_id, project=request.auth.project)
+
+            if bot.state != BotStates.ENDED:
+                return Response({"error": "Cannot create transcription because bot is not in state ended. It is in state " + BotStates.state_to_api_code(bot.state)}, status=status.HTTP_400_BAD_REQUEST)
+
+            recording = Recording.objects.filter(bot=bot, is_default_recording=True).first()
+            if not recording:
+                return Response(
+                    {"error": "No recording found for bot"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            existing_post_meeting_transcription_recording_artifact = RecordingArtifact.objects.filter(
+                recording=recording,
+                artifact_type=RecordingArtifactTypes.POST_MEETING_TRANSCRIPTION,
+            ).first()
+            if existing_post_meeting_transcription_recording_artifact:
+                return Response({"error": "Post meeting transcription already exists for this recording"}, status=status.HTTP_400_BAD_REQUEST)
+
+            post_meeting_transcription_recording_artifact = RecordingArtifact.objects.create(
+                recording=recording,
+                artifact_type=RecordingArtifactTypes.POST_MEETING_TRANSCRIPTION,
+            )
+
+            create_post_meeting_transcription.delay(post_meeting_transcription_recording_artifact.id)
+
+            return Response(RecordingArtifactSerializer(post_meeting_transcription_recording_artifact).data)
         except Bot.DoesNotExist:
             return Response({"error": "Bot not found"}, status=status.HTTP_404_NOT_FOUND)
 

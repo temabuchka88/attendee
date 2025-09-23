@@ -1945,10 +1945,11 @@ class CalendarEventSerializer(serializers.ModelSerializer):
 class RecordingArtifactSerializer(serializers.ModelSerializer):
     bot_id = serializers.SerializerMethodField()
     state = serializers.SerializerMethodField()
+    id = serializers.CharField(source="object_id")
 
     class Meta:
         model = RecordingArtifact
-        fields = ["bot_id", "object_id", "created_at", "updated_at", "state", "failure_data"]
+        fields = ["bot_id", "id", "created_at", "updated_at", "state", "failure_data"]
         read_only_fields = fields
 
     def get_bot_id(self, obj):

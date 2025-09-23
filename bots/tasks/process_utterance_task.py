@@ -85,21 +85,25 @@ def process_utterance(self, utterance_id):
         # If the utterance has an associated audio chunk, clear the audio blob on the audio chunk
         if utterance.audio_chunk:
             utterance_audio_chunk = utterance.audio_chunk
-            utterance_audio_chunk.audio_blob = b""
-            utterance_audio_chunk.save()
+            # utterance_audio_chunk.audio_blob = b""
+            # utterance_audio_chunk.save()
 
         utterance.transcription = transcription
         utterance.save()
 
         logger.info(f"Transcription complete for utterance {utterance_id}")
 
-        # Don't send webhook for empty transcript
-        if utterance.transcription.get("transcript"):
+        # Don't send webhook for empty transcript or a post meeting transcription
+        if utterance.transcription.get("transcript") and utterance.is_for_post_meeting_transcription() is False:
             trigger_webhook(
                 webhook_trigger_type=WebhookTriggerTypes.TRANSCRIPT_UPDATE,
                 bot=recording.bot,
                 payload=utterance_webhook_payload(utterance),
             )
+
+    # If the utterance is for post meeting transcription, we don't need to do anything with the recording state.
+    if utterance.is_for_post_meeting_transcription():
+        return
 
     # If the recording is in a terminal state and there are no more utterances to transcribe, set the recording's transcription state to complete
     if RecordingManager.is_terminal_state(utterance.recording.state) and Utterance.objects.filter(recording=utterance.recording, transcription__isnull=True).count() == 0:

@@ -1,4 +1,5 @@
 from .autopay_charge_task import autopay_charge
+from .create_post_meeting_transcription_task import create_post_meeting_transcription
 from .deliver_webhook_task import deliver_webhook
 from .launch_scheduled_bot_task import launch_scheduled_bot
 from .process_utterance_task import process_utterance
@@ -15,4 +16,5 @@ __all__ = [
     "launch_scheduled_bot",
     "sync_calendar",
     "autopay_charge",
+    "create_post_meeting_transcription",
 ]

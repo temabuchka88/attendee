@@ -1718,6 +1718,7 @@ class TranscriptionFailureReasons(models.TextChoices):
     INTERNAL_ERROR = "internal_error"
     # This reason applies to the transcription operation as a whole, not a specific utterance
     UTTERANCES_STILL_IN_PROGRESS_WHEN_RECORDING_TERMINATED = "utterances_still_in_progress_when_recording_terminated"
+    UTTERANCES_STILL_IN_PROGRESS_WHEN_TRANSCRIPTION_TERMINATED = "utterances_still_in_progress_when_transcription_terminated"
 
 
 class RecordingArtifactStates(models.IntegerChoices):
@@ -1747,6 +1748,9 @@ class RecordingArtifact(models.Model):
     state = models.IntegerField(choices=RecordingArtifactStates.choices, default=RecordingArtifactStates.NOT_STARTED)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    failed_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
     recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="artifacts")
     settings = models.JSONField(null=False, default=dict)
     failure_data = models.JSONField(null=True, default=None)
@@ -1780,6 +1784,7 @@ class RecordingArtifactManager:
             raise ValueError(f"Invalid state transition. Recording {recording_artifact.id} is in state {recording_artifact.get_state_display()}")
 
         recording_artifact.state = RecordingArtifactStates.IN_PROGRESS
+        recording_artifact.started_at = timezone.now()
         recording_artifact.save()
 
     @classmethod
@@ -1792,6 +1797,7 @@ class RecordingArtifactManager:
             raise ValueError(f"Invalid state transition. Recording {recording_artifact.id} is in state {recording_artifact.get_state_display()}")
 
         recording_artifact.state = RecordingArtifactStates.COMPLETE
+        recording_artifact.completed_at = timezone.now()
         recording_artifact.save()
 
     @classmethod
@@ -1800,11 +1806,12 @@ class RecordingArtifactManager:
 
         if recording_artifact.state == RecordingArtifactStates.FAILED:
             return
-        if recording_artifact.state != RecordingArtifactStates.IN_PROGRESS:
+        if recording_artifact.state != RecordingArtifactStates.IN_PROGRESS and recording_artifact.state != RecordingArtifactStates.NOT_STARTED:
             raise ValueError(f"Invalid state transition. Recording {recording_artifact.id} is in state {recording_artifact.get_state_display()}")
 
         recording_artifact.state = RecordingArtifactStates.FAILED
         recording_artifact.failure_data = failure_data
+        recording_artifact.failed_at = timezone.now()
         recording_artifact.save()
 
 
@@ -1880,6 +1887,9 @@ class Utterance(models.Model):
         if self.audio_chunk:
             return self.audio_chunk.sample_rate
         return self.sample_rate
+
+    def is_for_post_meeting_transcription(self):
+        return self.recording_artifact is not None
 
 
 class Credentials(models.Model):
