@@ -1720,7 +1720,7 @@ class TranscriptionFailureReasons(models.TextChoices):
     UTTERANCES_STILL_IN_PROGRESS_WHEN_RECORDING_TERMINATED = "utterances_still_in_progress_when_recording_terminated"
 
 
-class RecordingJobStates(models.IntegerChoices):
+class RecordingArtifactStates(models.IntegerChoices):
     NOT_STARTED = 1, "Not Started"
     IN_PROGRESS = 2, "In Progress"
     COMPLETE = 3, "Complete"
@@ -1738,71 +1738,74 @@ class RecordingJobStates(models.IntegerChoices):
         return mapping.get(value)
 
 
-class RecordingJobTypes(models.IntegerChoices):
+class RecordingArtifactTypes(models.IntegerChoices):
     POST_MEETING_TRANSCRIPTION = 1, "Post Meeting Transcription"
 
 
-class RecordingJob(models.Model):
-    OBJECT_ID_PREFIX = "job_"
-
+class RecordingArtifact(models.Model):
     object_id = models.CharField(max_length=32, unique=True, editable=False)
-    state = models.IntegerField(choices=RecordingJobStates.choices, default=RecordingJobStates.NOT_STARTED)
+    state = models.IntegerField(choices=RecordingArtifactStates.choices, default=RecordingArtifactStates.NOT_STARTED)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="jobs")
+    recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="artifacts")
     settings = models.JSONField(null=False, default=dict)
     failure_data = models.JSONField(null=True, default=None)
-    job_type = models.IntegerField(choices=RecordingJobTypes.choices, null=False)
+    artifact_type = models.IntegerField(choices=RecordingArtifactTypes.choices, null=False)
     version = IntegerVersionField()
 
     def save(self, *args, **kwargs):
+        if self.artifact_type == RecordingArtifactTypes.POST_MEETING_TRANSCRIPTION:
+            object_id_prefix = "tran_"
+        else:
+            raise ValueError(f"Invalid artifact type: {self.artifact_type}")
+
         if not self.object_id:
             # Generate a random 16-character string
             random_string = "".join(random.choices(string.ascii_letters + string.digits, k=16))
-            self.object_id = f"{self.OBJECT_ID_PREFIX}{random_string}"
+            self.object_id = f"{object_id_prefix}{random_string}"
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Recording Job {self.object_id} - {self.get_state_display()}"
+        return f"Recording Artifact {self.object_id} - {self.get_state_display()}"
 
 
-class RecordingJobManager:
+class RecordingArtifactManager:
     @classmethod
-    def set_recording_job_in_progress(cls, recording_job: RecordingJob):
-        recording_job.refresh_from_db()
+    def set_recording_artifact_in_progress(cls, recording_artifact: RecordingArtifact):
+        recording_artifact.refresh_from_db()
 
-        if recording_job.state == RecordingJobStates.IN_PROGRESS:
+        if recording_artifact.state == RecordingArtifactStates.IN_PROGRESS:
             return
-        if recording_job.state != RecordingJobStates.NOT_STARTED:
-            raise ValueError(f"Invalid state transition. Recording {recording_job.id} is in state {recording_job.get_state_display()}")
+        if recording_artifact.state != RecordingArtifactStates.NOT_STARTED:
+            raise ValueError(f"Invalid state transition. Recording {recording_artifact.id} is in state {recording_artifact.get_state_display()}")
 
-        recording_job.state = RecordingJobStates.IN_PROGRESS
-        recording_job.save()
-
-    @classmethod
-    def set_recording_job_complete(cls, recording_job: RecordingJob):
-        recording_job.refresh_from_db()
-
-        if recording_job.state == RecordingJobStates.COMPLETE:
-            return
-        if recording_job.state != RecordingJobStates.IN_PROGRESS:
-            raise ValueError(f"Invalid state transition. Recording {recording_job.id} is in state {recording_job.get_state_display()}")
-
-        recording_job.state = RecordingJobStates.COMPLETE
-        recording_job.save()
+        recording_artifact.state = RecordingArtifactStates.IN_PROGRESS
+        recording_artifact.save()
 
     @classmethod
-    def set_recording_job_failed(cls, recording_job: RecordingJob, failure_data: dict):
-        recording_job.refresh_from_db()
+    def set_recording_artifact_complete(cls, recording_artifact: RecordingArtifact):
+        recording_artifact.refresh_from_db()
 
-        if recording_job.state == RecordingJobStates.FAILED:
+        if recording_artifact.state == RecordingArtifactStates.COMPLETE:
             return
-        if recording_job.state != RecordingJobStates.IN_PROGRESS:
-            raise ValueError(f"Invalid state transition. Recording {recording_job.id} is in state {recording_job.get_state_display()}")
+        if recording_artifact.state != RecordingArtifactStates.IN_PROGRESS:
+            raise ValueError(f"Invalid state transition. Recording {recording_artifact.id} is in state {recording_artifact.get_state_display()}")
 
-        recording_job.state = RecordingJobStates.FAILED
-        recording_job.failure_data = failure_data
-        recording_job.save()
+        recording_artifact.state = RecordingArtifactStates.COMPLETE
+        recording_artifact.save()
+
+    @classmethod
+    def set_recording_artifact_failed(cls, recording_artifact: RecordingArtifact, failure_data: dict):
+        recording_artifact.refresh_from_db()
+
+        if recording_artifact.state == RecordingArtifactStates.FAILED:
+            return
+        if recording_artifact.state != RecordingArtifactStates.IN_PROGRESS:
+            raise ValueError(f"Invalid state transition. Recording {recording_artifact.id} is in state {recording_artifact.get_state_display()}")
+
+        recording_artifact.state = RecordingArtifactStates.FAILED
+        recording_artifact.failure_data = failure_data
+        recording_artifact.save()
 
 
 class AudioChunk(models.Model):
@@ -1841,7 +1844,7 @@ class Utterance(models.Model):
         MP3 = 2, "MP3"
 
     recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="utterances")
-    recording_job = models.ForeignKey(RecordingJob, on_delete=models.CASCADE, related_name="utterances", null=True, blank=True)
+    recording_artifact = models.ForeignKey(RecordingArtifact, on_delete=models.CASCADE, related_name="utterances", null=True, blank=True)
     audio_chunk = models.ForeignKey(AudioChunk, on_delete=models.SET_NULL, related_name="utterances", null=True, blank=True)
     participant = models.ForeignKey(Participant, on_delete=models.PROTECT, related_name="utterances")
     timestamp_ms = models.BigIntegerField()

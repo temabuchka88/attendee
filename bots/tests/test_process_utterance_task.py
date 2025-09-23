@@ -1008,7 +1008,6 @@ class AssemblyAIProviderTest(TransactionTestCase):
             audio_chunk=self.audio_chunk,
             timestamp_ms=0,
             duration_ms=600,
-            sample_rate=16_000,
         )
         self.utterance.refresh_from_db()
         self.cred = CredModel.objects.create(

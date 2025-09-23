@@ -32,6 +32,8 @@ from .models import (
     MeetingTypes,
     ParticipantEventTypes,
     Recording,
+    RecordingArtifact,
+    RecordingArtifactStates,
     RecordingFormats,
     RecordingResolutions,
     RecordingStates,
@@ -1938,3 +1940,21 @@ class CalendarEventSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = fields
+
+
+class RecordingArtifactSerializer(serializers.ModelSerializer):
+    bot_id = serializers.SerializerMethodField()
+    state = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RecordingArtifact
+        fields = ["bot_id", "object_id", "created_at", "updated_at", "state", "failure_data"]
+        read_only_fields = fields
+
+    def get_bot_id(self, obj):
+        """Return the bot's object_id from the related recording"""
+        return obj.recording.bot.object_id
+
+    def get_state(self, obj):
+        """Return the state as an API code"""
+        return RecordingArtifactStates.state_to_api_code(obj.state)
