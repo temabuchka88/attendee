@@ -18,6 +18,8 @@ from rest_framework import serializers
 
 from .automatic_leave_configuration import AutomaticLeaveConfiguration
 from .models import (
+    AsyncTranscription,
+    AsyncTranscriptionStates,
     Bot,
     BotChatMessageToOptions,
     BotEventSubTypes,
@@ -32,8 +34,6 @@ from .models import (
     MeetingTypes,
     ParticipantEventTypes,
     Recording,
-    RecordingArtifact,
-    RecordingArtifactStates,
     RecordingFormats,
     RecordingResolutions,
     RecordingStates,
@@ -1942,13 +1942,13 @@ class CalendarEventSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class RecordingArtifactSerializer(serializers.ModelSerializer):
+class AsyncTranscriptionSerializer(serializers.ModelSerializer):
     bot_id = serializers.SerializerMethodField()
     state = serializers.SerializerMethodField()
     id = serializers.CharField(source="object_id")
 
     class Meta:
-        model = RecordingArtifact
+        model = AsyncTranscription
         fields = ["bot_id", "id", "created_at", "updated_at", "state", "failure_data"]
         read_only_fields = fields
 
@@ -1958,4 +1958,4 @@ class RecordingArtifactSerializer(serializers.ModelSerializer):
 
     def get_state(self, obj):
         """Return the state as an API code"""
-        return RecordingArtifactStates.state_to_api_code(obj.state)
+        return AsyncTranscriptionStates.state_to_api_code(obj.state)

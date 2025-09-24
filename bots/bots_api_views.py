@@ -22,6 +22,8 @@ from .bots_api_utils import BotCreationSource, create_bot, create_bot_chat_messa
 from .launch_bot_utils import launch_bot
 from .meeting_url_utils import meeting_type_from_url
 from .models import (
+    AsyncTranscription,
+    AsyncTranscriptionStates,
     Bot,
     BotEventManager,
     BotEventSubTypes,
@@ -37,12 +39,10 @@ from .models import (
     Participant,
     ParticipantEvent,
     Recording,
-    RecordingArtifact,
-    RecordingArtifactStates,
-    RecordingArtifactTypes,
     Utterance,
 )
 from .serializers import (
+    AsyncTranscriptionSerializer,
     BotChatMessageRequestSerializer,
     BotImageSerializer,
     BotSerializer,
@@ -51,12 +51,11 @@ from .serializers import (
     ParticipantEventSerializer,
     ParticipantSerializer,
     PatchBotSerializer,
-    RecordingArtifactSerializer,
     RecordingSerializer,
     SpeechSerializer,
     TranscriptUtteranceSerializer,
 )
-from .tasks import create_post_meeting_transcription
+from .tasks import process_async_transcription
 from .throttling import ProjectPostThrottle
 
 TokenHeaderParameter = [
@@ -750,16 +749,16 @@ class TranscriptView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            recording_artifact = None
+            async_transcription = None
             if request.query_params.get("transcript_id"):
-                recording_artifact = recording.artifacts.get(
+                async_transcription = recording.async_transcriptions.get(
                     object_id=request.query_params.get("transcript_id"),
-                    artifact_type=RecordingArtifactTypes.POST_MEETING_TRANSCRIPTION,
-                    state=RecordingArtifactStates.COMPLETE,
                 )
+                if async_transcription.state != AsyncTranscriptionStates.COMPLETE:
+                    return Response({"error": f"Async transcription {async_transcription.object_id} is not complete. It is in state {AsyncTranscriptionStates.state_to_api_code(async_transcription.state)}"}, status=status.HTTP_400_BAD_REQUEST)
 
             # Get all utterances with transcriptions, sorted by timeline
-            utterances_query = Utterance.objects.select_related("participant").filter(recording=recording, transcription__isnull=False, recording_artifact=recording_artifact)
+            utterances_query = Utterance.objects.select_related("participant").filter(recording=recording, transcription__isnull=False, async_transcription=async_transcription)
 
             # Apply updated_after filter if provided
             updated_after = request.query_params.get("updated_after")
@@ -798,7 +797,7 @@ class TranscriptView(APIView):
 
         except Bot.DoesNotExist:
             return Response({"error": "Bot not found"}, status=status.HTTP_404_NOT_FOUND)
-        except RecordingArtifact.DoesNotExist:
+        except AsyncTranscription.DoesNotExist:
             return Response({"error": "Transcription not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def post(self, request, object_id):
@@ -815,21 +814,18 @@ class TranscriptView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            existing_post_meeting_transcription_recording_artifact = RecordingArtifact.objects.filter(
+            existing_async_transcription_async_transcription = AsyncTranscription.objects.filter(
                 recording=recording,
-                artifact_type=RecordingArtifactTypes.POST_MEETING_TRANSCRIPTION,
             ).first()
-            if existing_post_meeting_transcription_recording_artifact:
-                return Response({"error": "Post meeting transcription already exists for this recording"}, status=status.HTTP_400_BAD_REQUEST)
+            if existing_async_transcription_async_transcription:
+                return Response({"error": "Async transcription already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
-            post_meeting_transcription_recording_artifact = RecordingArtifact.objects.create(
-                recording=recording,
-                artifact_type=RecordingArtifactTypes.POST_MEETING_TRANSCRIPTION,
-            )
+            async_transcription_async_transcription = AsyncTranscription.objects.create(recording=recording)
 
-            create_post_meeting_transcription.delay(post_meeting_transcription_recording_artifact.id)
+            # Create celery task to process the async transcription
+            process_async_transcription.delay(async_transcription_async_transcription.id)
 
-            return Response(RecordingArtifactSerializer(post_meeting_transcription_recording_artifact).data)
+            return Response(AsyncTranscriptionSerializer(async_transcription_async_transcription).data)
         except Bot.DoesNotExist:
             return Response({"error": "Bot not found"}, status=status.HTTP_404_NOT_FOUND)
 

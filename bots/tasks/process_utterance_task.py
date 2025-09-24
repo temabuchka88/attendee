@@ -82,27 +82,29 @@ def process_utterance(self, utterance_id):
         # The direct audio_blob column on the utterance model is deprecated, but for backwards compatibility, we need to clear it if it exists
         if utterance.audio_blob:
             utterance.audio_blob = b""  # set the audio blob binary field to empty byte string
-        # If the utterance has an associated audio chunk, clear the audio blob on the audio chunk
-        if utterance.audio_chunk:
+
+        # If the utterance has an associated audio chunk, clear the audio blob on the audio chunk.
+        # If async transcription is enabled for the organization, do NOT clear it, because we may use it later in an async transcription.
+        if utterance.audio_chunk and not utterance.recording.bot.project.organization.is_async_transcription_enabled:
             utterance_audio_chunk = utterance.audio_chunk
-            # utterance_audio_chunk.audio_blob = b""
-            # utterance_audio_chunk.save()
+            utterance_audio_chunk.audio_blob = b""
+            utterance_audio_chunk.save()
 
         utterance.transcription = transcription
         utterance.save()
 
         logger.info(f"Transcription complete for utterance {utterance_id}")
 
-        # Don't send webhook for empty transcript or a post meeting transcription
-        if utterance.transcription.get("transcript") and utterance.is_for_post_meeting_transcription() is False:
+        # Don't send webhook for empty transcript or an async transcription
+        if utterance.transcription.get("transcript") and utterance.async_transcription is None:
             trigger_webhook(
                 webhook_trigger_type=WebhookTriggerTypes.TRANSCRIPT_UPDATE,
                 bot=recording.bot,
                 payload=utterance_webhook_payload(utterance),
             )
 
-    # If the utterance is for post meeting transcription, we don't need to do anything with the recording state.
-    if utterance.is_for_post_meeting_transcription():
+    # If the utterance is for an async transcription, we don't need to do anything with the recording state.
+    if utterance.async_transcription is not None:
         return
 
     # If the recording is in a terminal state and there are no more utterances to transcribe, set the recording's transcription state to complete

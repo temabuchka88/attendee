@@ -1721,7 +1721,7 @@ class TranscriptionFailureReasons(models.TextChoices):
     UTTERANCES_STILL_IN_PROGRESS_WHEN_TRANSCRIPTION_TERMINATED = "utterances_still_in_progress_when_transcription_terminated"
 
 
-class RecordingArtifactStates(models.IntegerChoices):
+class AsyncTranscriptionStates(models.IntegerChoices):
     NOT_STARTED = 1, "Not Started"
     IN_PROGRESS = 2, "In Progress"
     COMPLETE = 3, "Complete"
@@ -1739,80 +1739,71 @@ class RecordingArtifactStates(models.IntegerChoices):
         return mapping.get(value)
 
 
-class RecordingArtifactTypes(models.IntegerChoices):
-    POST_MEETING_TRANSCRIPTION = 1, "Post Meeting Transcription"
-
-
-class RecordingArtifact(models.Model):
+class AsyncTranscription(models.Model):
+    OBJECT_ID_PREFIX = "tran_"
     object_id = models.CharField(max_length=32, unique=True, editable=False)
-    state = models.IntegerField(choices=RecordingArtifactStates.choices, default=RecordingArtifactStates.NOT_STARTED)
+    state = models.IntegerField(choices=AsyncTranscriptionStates.choices, default=AsyncTranscriptionStates.NOT_STARTED)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     started_at = models.DateTimeField(null=True, blank=True)
     failed_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
-    recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="artifacts")
+    recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="async_transcriptions")
     settings = models.JSONField(null=False, default=dict)
     failure_data = models.JSONField(null=True, default=None)
-    artifact_type = models.IntegerField(choices=RecordingArtifactTypes.choices, null=False)
     version = IntegerVersionField()
 
     def save(self, *args, **kwargs):
-        if self.artifact_type == RecordingArtifactTypes.POST_MEETING_TRANSCRIPTION:
-            object_id_prefix = "tran_"
-        else:
-            raise ValueError(f"Invalid artifact type: {self.artifact_type}")
-
         if not self.object_id:
             # Generate a random 16-character string
             random_string = "".join(random.choices(string.ascii_letters + string.digits, k=16))
-            self.object_id = f"{object_id_prefix}{random_string}"
+            self.object_id = f"{self.OBJECT_ID_PREFIX}{random_string}"
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Recording Artifact {self.object_id} - {self.get_state_display()}"
+        return f"Post Meeting Transcription {self.object_id} - {self.get_state_display()}"
 
 
-class RecordingArtifactManager:
+class AsyncTranscriptionManager:
     @classmethod
-    def set_recording_artifact_in_progress(cls, recording_artifact: RecordingArtifact):
-        recording_artifact.refresh_from_db()
+    def set_async_transcription_in_progress(cls, async_transcription: AsyncTranscription):
+        async_transcription.refresh_from_db()
 
-        if recording_artifact.state == RecordingArtifactStates.IN_PROGRESS:
+        if async_transcription.state == AsyncTranscriptionStates.IN_PROGRESS:
             return
-        if recording_artifact.state != RecordingArtifactStates.NOT_STARTED:
-            raise ValueError(f"Invalid state transition. Recording {recording_artifact.id} is in state {recording_artifact.get_state_display()}")
+        if async_transcription.state != AsyncTranscriptionStates.NOT_STARTED:
+            raise ValueError(f"Invalid state transition. Async transcription {async_transcription.id} is in state {async_transcription.get_state_display()}")
 
-        recording_artifact.state = RecordingArtifactStates.IN_PROGRESS
-        recording_artifact.started_at = timezone.now()
-        recording_artifact.save()
-
-    @classmethod
-    def set_recording_artifact_complete(cls, recording_artifact: RecordingArtifact):
-        recording_artifact.refresh_from_db()
-
-        if recording_artifact.state == RecordingArtifactStates.COMPLETE:
-            return
-        if recording_artifact.state != RecordingArtifactStates.IN_PROGRESS:
-            raise ValueError(f"Invalid state transition. Recording {recording_artifact.id} is in state {recording_artifact.get_state_display()}")
-
-        recording_artifact.state = RecordingArtifactStates.COMPLETE
-        recording_artifact.completed_at = timezone.now()
-        recording_artifact.save()
+        async_transcription.state = AsyncTranscriptionStates.IN_PROGRESS
+        async_transcription.started_at = timezone.now()
+        async_transcription.save()
 
     @classmethod
-    def set_recording_artifact_failed(cls, recording_artifact: RecordingArtifact, failure_data: dict):
-        recording_artifact.refresh_from_db()
+    def set_async_transcription_complete(cls, async_transcription: AsyncTranscription):
+        async_transcription.refresh_from_db()
 
-        if recording_artifact.state == RecordingArtifactStates.FAILED:
+        if async_transcription.state == AsyncTranscriptionStates.COMPLETE:
             return
-        if recording_artifact.state != RecordingArtifactStates.IN_PROGRESS and recording_artifact.state != RecordingArtifactStates.NOT_STARTED:
-            raise ValueError(f"Invalid state transition. Recording {recording_artifact.id} is in state {recording_artifact.get_state_display()}")
+        if async_transcription.state != AsyncTranscriptionStates.IN_PROGRESS:
+            raise ValueError(f"Invalid state transition. Async transcription {async_transcription.id} is in state {async_transcription.get_state_display()}")
 
-        recording_artifact.state = RecordingArtifactStates.FAILED
-        recording_artifact.failure_data = failure_data
-        recording_artifact.failed_at = timezone.now()
-        recording_artifact.save()
+        async_transcription.state = AsyncTranscriptionStates.COMPLETE
+        async_transcription.completed_at = timezone.now()
+        async_transcription.save()
+
+    @classmethod
+    def set_async_transcription_failed(cls, async_transcription: AsyncTranscription, failure_data: dict):
+        async_transcription.refresh_from_db()
+
+        if async_transcription.state == AsyncTranscriptionStates.FAILED:
+            return
+        if async_transcription.state != AsyncTranscriptionStates.IN_PROGRESS and async_transcription.state != AsyncTranscriptionStates.NOT_STARTED:
+            raise ValueError(f"Invalid state transition. Async transcription {async_transcription.id} is in state {async_transcription.get_state_display()}")
+
+        async_transcription.state = AsyncTranscriptionStates.FAILED
+        async_transcription.failure_data = failure_data
+        async_transcription.failed_at = timezone.now()
+        async_transcription.save()
 
 
 class AudioChunk(models.Model):
@@ -1851,7 +1842,8 @@ class Utterance(models.Model):
         MP3 = 2, "MP3"
 
     recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="utterances")
-    recording_artifact = models.ForeignKey(RecordingArtifact, on_delete=models.CASCADE, related_name="utterances", null=True, blank=True)
+    # If none, the utterance is part of a real time transcription
+    async_transcription = models.ForeignKey(AsyncTranscription, on_delete=models.CASCADE, related_name="utterances", null=True, blank=True)
     audio_chunk = models.ForeignKey(AudioChunk, on_delete=models.SET_NULL, related_name="utterances", null=True, blank=True)
     participant = models.ForeignKey(Participant, on_delete=models.PROTECT, related_name="utterances")
     timestamp_ms = models.BigIntegerField()
@@ -1887,9 +1879,6 @@ class Utterance(models.Model):
         if self.audio_chunk:
             return self.audio_chunk.sample_rate
         return self.sample_rate
-
-    def is_for_post_meeting_transcription(self):
-        return self.recording_artifact is not None
 
 
 class Credentials(models.Model):

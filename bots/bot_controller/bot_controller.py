@@ -1100,6 +1100,7 @@ class BotController:
 
         utterance = Utterance.objects.create(
             source=Utterance.Sources.PER_PARTICIPANT_AUDIO,
+            async_transcription=None,  # This utterance is created during the meeting, so it's not associated with an async transcription
             recording=recording_in_progress,
             participant=participant,
             audio_chunk=audio_chunk,
