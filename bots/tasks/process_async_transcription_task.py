@@ -53,9 +53,9 @@ def check_for_transcription_completion(async_transcription):
         terminate_transcription(async_transcription)
         return
 
-    # An in progress utterance exists and we haven't timed out, so we need to check again in 2 minutes
-    logger.info(f"Checking for transcription completion for recording artifact {async_transcription.id} again in 2 minutes")
-    process_async_transcription.apply_async(args=[async_transcription.id], countdown=120)
+    # An in progress utterance exists and we haven't timed out, so we need to check again in 1 minute
+    logger.info(f"Checking for transcription completion for recording artifact {async_transcription.id} again in 1 minute")
+    process_async_transcription.apply_async(args=[async_transcription.id], countdown=60)
 
 
 @shared_task(

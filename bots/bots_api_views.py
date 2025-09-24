@@ -817,19 +817,19 @@ class TranscriptView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            existing_async_transcription_async_transcription_count = AsyncTranscription.objects.filter(
+            existing_async_transcription_count = AsyncTranscription.objects.filter(
                 recording=recording,
             ).count()
             # We only allow a max of 4 async transcriptions per recording
-            if existing_async_transcription_async_transcription_count >= 4:
+            if existing_async_transcription_count >= 4:
                 return Response({"error": "You cannot have more than 4 async transcriptions per bot."}, status=status.HTTP_400_BAD_REQUEST)
 
-            async_transcription_async_transcription = AsyncTranscription.objects.create(recording=recording)
+            async_transcription = AsyncTranscription.objects.create(recording=recording)
 
             # Create celery task to process the async transcription
-            process_async_transcription.delay(async_transcription_async_transcription.id)
+            process_async_transcription.delay(async_transcription.id)
 
-            return Response(AsyncTranscriptionSerializer(async_transcription_async_transcription).data)
+            return Response(AsyncTranscriptionSerializer(async_transcription).data)
         except Bot.DoesNotExist:
             return Response({"error": "Bot not found"}, status=status.HTTP_404_NOT_FOUND)
 
