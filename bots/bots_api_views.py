@@ -817,6 +817,9 @@ class TranscriptView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
+            if not recording.audio_chunks.exists():
+                return Response({"error": "Cannot create transcription because the recording audio chunks have been deleted."}, status=status.HTTP_400_BAD_REQUEST)
+
             existing_async_transcription_count = AsyncTranscription.objects.filter(
                 recording=recording,
             ).count()

@@ -111,6 +111,10 @@ class ApiObjectAccessIntegrationTest(TransactionTestCase):
         self.ended_recording_a = Recording.objects.create(bot=self.ended_bot_a, recording_type=RecordingTypes.AUDIO_AND_VIDEO, transcription_type=TranscriptionTypes.NON_REALTIME, is_default_recording=True, state=RecordingStates.COMPLETE)
         self.ended_recording_b = Recording.objects.create(bot=self.ended_bot_b, recording_type=RecordingTypes.AUDIO_AND_VIDEO, transcription_type=TranscriptionTypes.NON_REALTIME, is_default_recording=True, state=RecordingStates.COMPLETE)
 
+        # Create audio chunks for ended recordings
+        self.ended_audio_chunk_a = AudioChunk.objects.create(recording=self.ended_recording_a, participant=self.participant_a, audio_blob=b"dummy_audio_data", timestamp_ms=1000, duration_ms=2000, sample_rate=16000)
+        self.ended_audio_chunk_b = AudioChunk.objects.create(recording=self.ended_recording_b, participant=self.participant_b, audio_blob=b"dummy_audio_data", timestamp_ms=1000, duration_ms=2000, sample_rate=16000)
+
     def _make_authenticated_request(self, method, url, api_key, data=None):
         """Helper method to make authenticated API requests"""
         headers = {"HTTP_AUTHORIZATION": f"Token {api_key}", "HTTP_CONTENT_TYPE": "application/json"}
