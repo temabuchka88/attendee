@@ -750,9 +750,9 @@ class TranscriptView(APIView):
                 )
 
             async_transcription = None
-            if request.query_params.get("transcript_id"):
+            if request.query_params.get("async_transcription_id"):
                 async_transcription = recording.async_transcriptions.get(
-                    object_id=request.query_params.get("transcript_id"),
+                    object_id=request.query_params.get("async_transcription_id"),
                 )
                 if async_transcription.state != AsyncTranscriptionStates.COMPLETE:
                     return Response({"error": f"Async transcription {async_transcription.object_id} is not complete. It is in state {AsyncTranscriptionStates.state_to_api_code(async_transcription.state)}"}, status=status.HTTP_400_BAD_REQUEST)
@@ -798,14 +798,17 @@ class TranscriptView(APIView):
         except Bot.DoesNotExist:
             return Response({"error": "Bot not found"}, status=status.HTTP_404_NOT_FOUND)
         except AsyncTranscription.DoesNotExist:
-            return Response({"error": "Transcription not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Async Transcription not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def post(self, request, object_id):
         try:
             bot = Bot.objects.get(object_id=object_id, project=request.auth.project)
 
+            if not bot.project.organization.is_async_transcription_enabled:
+                return Response({"error": "Async transcription is not enabled for your account."}, status=status.HTTP_400_BAD_REQUEST)
+
             if bot.state != BotStates.ENDED:
-                return Response({"error": "Cannot create transcription because bot is not in state ended. It is in state " + BotStates.state_to_api_code(bot.state)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Cannot create async transcription because bot is not in state ended. It is in state " + BotStates.state_to_api_code(bot.state)}, status=status.HTTP_400_BAD_REQUEST)
 
             recording = Recording.objects.filter(bot=bot, is_default_recording=True).first()
             if not recording:
@@ -814,11 +817,12 @@ class TranscriptView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            existing_async_transcription_async_transcription = AsyncTranscription.objects.filter(
+            existing_async_transcription_async_transcription_count = AsyncTranscription.objects.filter(
                 recording=recording,
-            ).first()
-            if existing_async_transcription_async_transcription:
-                return Response({"error": "Async transcription already exists"}, status=status.HTTP_400_BAD_REQUEST)
+            ).count()
+            # We only allow a max of 4 async transcriptions per recording
+            if existing_async_transcription_async_transcription_count >= 4:
+                return Response({"error": "You cannot have more than 4 async transcriptions per bot."}, status=status.HTTP_400_BAD_REQUEST)
 
             async_transcription_async_transcription = AsyncTranscription.objects.create(recording=recording)
 
