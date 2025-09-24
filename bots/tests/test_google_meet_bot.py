@@ -335,24 +335,17 @@ class TestGoogleMeetBot(TransactionTestCase):
         self.assertEqual(Utterance.objects.filter(recording=self.recording, async_transcription=async_transcription).count(), Utterance.objects.filter(recording=self.recording, async_transcription=None).count())
 
         # Verify webhook delivery attempts were created for async transcription state changes
-        async_transcription_webhook_attempts = WebhookDeliveryAttempt.objects.filter(
-            bot=self.bot, 
-            webhook_trigger_type=WebhookTriggerTypes.ASYNC_TRANSCRIPTION_STATE_CHANGE
-        )
+        async_transcription_webhook_attempts = WebhookDeliveryAttempt.objects.filter(bot=self.bot, webhook_trigger_type=WebhookTriggerTypes.ASYNC_TRANSCRIPTION_STATE_CHANGE)
         # Should have two webhook attempts: one for IN_PROGRESS, one for COMPLETE
         self.assertEqual(async_transcription_webhook_attempts.count(), 2, "Expected webhook delivery attempts for async transcription state changes")
-        
+
         # Verify the webhook payloads contain the expected async transcription data
-        in_progress_webhook = async_transcription_webhook_attempts.filter(
-            payload__state="in_progress"
-        ).first()
+        in_progress_webhook = async_transcription_webhook_attempts.filter(payload__state="in_progress").first()
         self.assertIsNotNone(in_progress_webhook, "Expected webhook for IN_PROGRESS state")
         self.assertEqual(in_progress_webhook.payload["id"], async_transcription.object_id)
         self.assertIsNone(in_progress_webhook.payload["failure_data"])
-        
-        complete_webhook = async_transcription_webhook_attempts.filter(
-            payload__state="complete"
-        ).first()
+
+        complete_webhook = async_transcription_webhook_attempts.filter(payload__state="complete").first()
         self.assertIsNotNone(complete_webhook, "Expected webhook for COMPLETE state")
         self.assertEqual(complete_webhook.payload["id"], async_transcription.object_id)
         self.assertIsNone(complete_webhook.payload["failure_data"])
@@ -374,30 +367,27 @@ class TestGoogleMeetBot(TransactionTestCase):
         self.assertEqual(Utterance.objects.filter(recording=self.recording, async_transcription=async_transcription_after_credentials_deleted).count(), Utterance.objects.filter(recording=self.recording, async_transcription=None).count())
 
         # Verify webhook delivery attempts were created for the failed async transcription
-        failed_async_transcription_webhook_attempts = WebhookDeliveryAttempt.objects.filter(
-            bot=self.bot,
-            webhook_trigger_type=WebhookTriggerTypes.ASYNC_TRANSCRIPTION_STATE_CHANGE
-        ).order_by('created_at')
+        failed_async_transcription_webhook_attempts = WebhookDeliveryAttempt.objects.filter(bot=self.bot, webhook_trigger_type=WebhookTriggerTypes.ASYNC_TRANSCRIPTION_STATE_CHANGE).order_by("created_at")
         # Should now have 4 total webhook attempts: 2 from successful transcription + 2 from failed transcription
         self.assertEqual(failed_async_transcription_webhook_attempts.count(), 4, "Expected additional webhook delivery attempts for failed async transcription")
-        
+
         # Get the last two webhook attempts (for the failed transcription)
-        latest_webhooks = failed_async_transcription_webhook_attempts.order_by('-created_at')[:2]
-        
+        latest_webhooks = failed_async_transcription_webhook_attempts.order_by("-created_at")[:2]
+
         # Find the IN_PROGRESS and FAILED webhooks for the second transcription
         failed_transcription_in_progress_webhook = None
         failed_transcription_failed_webhook = None
-        
+
         for webhook in latest_webhooks:
             if webhook.payload.get("id") == async_transcription_after_credentials_deleted.object_id:
                 if webhook.payload.get("state") == "in_progress":
                     failed_transcription_in_progress_webhook = webhook
                 elif webhook.payload.get("state") == "failed":
                     failed_transcription_failed_webhook = webhook
-        
+
         self.assertIsNotNone(failed_transcription_in_progress_webhook, "Expected webhook for failed transcription IN_PROGRESS state")
         self.assertIsNone(failed_transcription_in_progress_webhook.payload["failure_data"])
-        
+
         self.assertIsNotNone(failed_transcription_failed_webhook, "Expected webhook for FAILED state")
         self.assertIn(TranscriptionFailureReasons.CREDENTIALS_NOT_FOUND, failed_transcription_failed_webhook.payload["failure_data"]["failure_reasons"])
 
