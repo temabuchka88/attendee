@@ -2269,6 +2269,7 @@ class WebhookTriggerTypes(models.IntegerChoices):
             cls.PARTICIPANT_EVENTS_JOIN_LEAVE: "participant_events.join_leave",
             cls.CALENDAR_EVENTS_UPDATE: "calendar.events_update",
             cls.CALENDAR_STATE_CHANGE: "calendar.state_change",
+            cls.ASYNC_TRANSCRIPTION_STATE_CHANGE: "async_transcription.state_change",
         }
 
     @classmethod
