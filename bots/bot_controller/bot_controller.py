@@ -20,6 +20,7 @@ from bots.bots_api_utils import BotCreationSource
 from bots.external_callback_utils import get_zoom_tokens
 from bots.meeting_url_utils import meeting_type_from_url
 from bots.models import (
+    AudioChunk,
     Bot,
     BotChatMessageRequestManager,
     BotChatMessageRequestStates,
@@ -1086,15 +1087,25 @@ class BotController:
             logger.warning("Warning: No recording in progress found so cannot save individual audio utterance.")
             return
 
-        utterance = Utterance.objects.create(
-            source=Utterance.Sources.PER_PARTICIPANT_AUDIO,
+        audio_chunk = AudioChunk.objects.create(
             recording=recording_in_progress,
-            participant=participant,
             audio_blob=message["audio_data"],
-            audio_format=Utterance.AudioFormat.PCM,
+            audio_format=AudioChunk.AudioFormat.PCM,
             timestamp_ms=message["timestamp_ms"] - self.get_per_participant_audio_utterance_delay_ms(),
             duration_ms=len(message["audio_data"]) / ((message["sample_rate"] / 1000) * 2),
             sample_rate=message["sample_rate"],
+            source=AudioChunk.Sources.PER_PARTICIPANT_AUDIO,
+            participant=participant,
+        )
+
+        utterance = Utterance.objects.create(
+            source=Utterance.Sources.PER_PARTICIPANT_AUDIO,
+            async_transcription=None,  # This utterance is created during the meeting, so it's not associated with an async transcription
+            recording=recording_in_progress,
+            participant=participant,
+            audio_chunk=audio_chunk,
+            timestamp_ms=audio_chunk.timestamp_ms,
+            duration_ms=audio_chunk.duration_ms,
         )
 
         # Set the recording transcription in progress
