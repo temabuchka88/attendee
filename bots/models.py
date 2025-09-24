@@ -1778,6 +1778,8 @@ class AsyncTranscriptionManager:
         async_transcription.started_at = timezone.now()
         async_transcription.save()
 
+        cls.delivery_webhook(async_transcription)
+
     @classmethod
     def set_async_transcription_complete(cls, async_transcription: AsyncTranscription):
         async_transcription.refresh_from_db()
@@ -1790,6 +1792,20 @@ class AsyncTranscriptionManager:
         async_transcription.state = AsyncTranscriptionStates.COMPLETE
         async_transcription.completed_at = timezone.now()
         async_transcription.save()
+
+        cls.delivery_webhook(async_transcription)
+
+    @classmethod
+    def delivery_webhook(cls, async_transcription: AsyncTranscription):
+        trigger_webhook(
+            webhook_trigger_type=WebhookTriggerTypes.ASYNC_TRANSCRIPTION_STATE_CHANGE,
+            bot=async_transcription.recording.bot,
+            payload={
+                "state": AsyncTranscriptionStates.state_to_api_code(async_transcription.state),
+                "id": async_transcription.object_id,
+                "failure_data": async_transcription.failure_data,
+            },
+        )
 
     @classmethod
     def set_async_transcription_failed(cls, async_transcription: AsyncTranscription, failure_data: dict):
@@ -1804,6 +1820,8 @@ class AsyncTranscriptionManager:
         async_transcription.failure_data = failure_data
         async_transcription.failed_at = timezone.now()
         async_transcription.save()
+
+        cls.delivery_webhook(async_transcription)
 
 
 class AudioChunk(models.Model):
@@ -2238,6 +2256,7 @@ class WebhookTriggerTypes(models.IntegerChoices):
     PARTICIPANT_EVENTS_JOIN_LEAVE = 4, "Participant Join/Leave"
     CALENDAR_EVENTS_UPDATE = 5, "Calendar Events Update"
     CALENDAR_STATE_CHANGE = 6, "Calendar State Change"
+    ASYNC_TRANSCRIPTION_STATE_CHANGE = 7, "Async Transcription State Change"
     # add other event types here
 
     @classmethod
