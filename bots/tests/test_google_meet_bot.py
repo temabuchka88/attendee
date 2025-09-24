@@ -14,6 +14,8 @@ from selenium.common.exceptions import TimeoutException
 from bots.bot_controller import BotController
 from bots.google_meet_bot_adapter.google_meet_ui_methods import GoogleMeetUIMethods
 from bots.models import (
+    AsyncTranscription,
+    AsyncTranscriptionStates,
     Bot,
     BotEventManager,
     BotEventSubTypes,
@@ -27,6 +29,7 @@ from bots.models import (
     RecordingStates,
     RecordingTranscriptionStates,
     RecordingTypes,
+    TranscriptionFailureReasons,
     TranscriptionProviders,
     TranscriptionTypes,
     Utterance,
@@ -35,6 +38,7 @@ from bots.models import (
     WebhookSubscription,
     WebhookTriggerTypes,
 )
+from bots.tasks.process_async_transcription_task import process_async_transcription
 from bots.tests.mock_data import create_mock_file_uploader, create_mock_google_meet_driver
 from bots.web_bot_adapter.ui_methods import UiCouldNotJoinMeetingWaitingRoomTimeoutException
 
@@ -314,6 +318,37 @@ class TestGoogleMeetBot(TransactionTestCase):
 
         # Close the database connection since we're in a thread
         connection.close()
+
+        # Now test creating an async transcription
+        async_transcription = AsyncTranscription.objects.create(recording=self.recording)
+        self.assertEqual(async_transcription.state, AsyncTranscriptionStates.NOT_STARTED)
+
+        process_async_transcription.delay(async_transcription.id)
+
+        async_transcription.refresh_from_db()
+
+        self.assertEqual(async_transcription.state, AsyncTranscriptionStates.COMPLETE)
+        self.assertIsNotNone(async_transcription.completed_at)
+        self.assertIsNotNone(async_transcription.started_at)
+        self.assertIsNone(async_transcription.failure_data)
+        self.assertEqual(utterances.first().transcription, async_transcription.utterances.first().transcription)
+        self.assertEqual(Utterance.objects.filter(recording=self.recording, async_transcription=async_transcription).count(), Utterance.objects.filter(recording=self.recording, async_transcription=None).count())
+
+        # Now delete the deepgram credentials to simulate transcription failure
+        self.deepgram_credentials.delete()
+        async_transcription_after_credentials_deleted = AsyncTranscription.objects.create(recording=self.recording)
+
+        process_async_transcription.delay(async_transcription_after_credentials_deleted.id)
+
+        async_transcription_after_credentials_deleted.refresh_from_db()
+
+        self.assertEqual(async_transcription_after_credentials_deleted.state, AsyncTranscriptionStates.FAILED)
+        self.assertIsNotNone(async_transcription_after_credentials_deleted.failure_data.get("failure_reasons"))
+        self.assertIn(TranscriptionFailureReasons.CREDENTIALS_NOT_FOUND, async_transcription_after_credentials_deleted.failure_data.get("failure_reasons"))
+        self.assertIsNotNone(async_transcription_after_credentials_deleted.failed_at)
+        self.assertIsNotNone(async_transcription_after_credentials_deleted.started_at)
+        self.assertIsNone(async_transcription_after_credentials_deleted.completed_at)
+        self.assertEqual(Utterance.objects.filter(recording=self.recording, async_transcription=async_transcription_after_credentials_deleted).count(), Utterance.objects.filter(recording=self.recording, async_transcription=None).count())
 
     @patch("bots.models.Bot.create_debug_recording", return_value=False)
     @patch("bots.web_bot_adapter.web_bot_adapter.Display")
