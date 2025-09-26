@@ -236,13 +236,13 @@ class TestCreateBot(TestCase):
         self.assertIn("'invalid_trigger' is not one of", str(error["webhooks"][0]))
 
     def test_with_invalid_webhook_url(self):
-        bot, error = create_bot(data={"meeting_url": "https://meet.google.com/abc-defg-hij", "bot_name": "Test Bot", "webhooks": [{"url": "http://example.com", "triggers": ["bot.state_change"]}]}, source=BotCreationSource.API, project=self.project)
+        bot, error = create_bot(data={"meeting_url": "https://meet.google.com/abc-defg-hij", "bot_name": "Test Bot", "webhooks": [{"url": "ftp://example.com", "triggers": ["bot.state_change"]}]}, source=BotCreationSource.API, project=self.project)
         self.assertIsNone(bot)
         self.assertEqual(Bot.objects.count(), 0)
         self.assertIsNotNone(error)
         self.assertIn("webhooks", error)
         self.assertIsInstance(error["webhooks"], list)
-        self.assertIn("does not match '^https://.*'", str(error["webhooks"][0]))
+        self.assertIn("does not match '^https?://.*'", str(error["webhooks"][0]))
 
     def test_with_duplicate_webhook_url(self):
         bot, error = create_bot(data={"meeting_url": "https://meet.google.com/abc-defg-hij", "bot_name": "Test Bot", "webhooks": [{"url": "https://example.com", "triggers": ["bot.state_change"]}, {"url": "https://example.com", "triggers": ["bot.state_change"]}]}, source=BotCreationSource.API, project=self.project)

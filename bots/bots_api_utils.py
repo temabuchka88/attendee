@@ -359,8 +359,8 @@ def validate_webhook_data(url, triggers, project, bot=None):
             return f"Invalid webhook trigger type: {trigger}"
 
     # Check if URL is valid
-    if not url.startswith("https://"):
-        return "webhook URL must start with https://"
+    if not url.startswith("https://") and not url.startswith("http://"):
+        return "webhook URL must start with http:// or https://"
 
     # Check for duplicate URLs
     existing_webhook_query = project.webhook_subscriptions.filter(url=url)

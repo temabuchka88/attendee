@@ -460,7 +460,7 @@ def get_webhook_trigger_enum():
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "The webhook URL (must be HTTPS)",
+                    "pattern": "^https?://.*",
                 },
                 "triggers": {
                     "type": "array",
@@ -673,7 +673,7 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
             "properties": {
                 "url": {
                     "type": "string",
-                    "pattern": "^https://.*",
+                    "pattern": "^https?://.*",
                 },
                 "triggers": {
                     "type": "array",
